@@ -13,7 +13,7 @@
 typedef enum sCompressionCode
 {
 	WAV_FMT_COMP_CODE_UNKNOWN		= 0x0000,	// Unknown
-	WAV_FMT_COMP_CODE_PCM			= 0x0001,	// PCM / uncompressed
+	WAV_FMT_COMP_CODE_PCM			= 0x0001,	// PCM/uncompressed
 	WAV_FMT_COMP_CODE_ADPCM			= 0x0002,	// Microsoft ADPCM
 	WAV_FMT_COMP_CODE_G711_ALAW		= 0x0006,	// ITU G.711 a-law
 	WAV_FMT_COMP_CODE_G711_ULAW		= 0x0007,	// ITU G.711 u-law
@@ -59,7 +59,7 @@ int FileWavCreate
 /*****************************************************************************************************************************/
 int FileWavAppendData
 (
-	char* pData,
+	void* pData,
 	unsigned int size, /// in bytes
 	tWaveFileParams* pParams
 );

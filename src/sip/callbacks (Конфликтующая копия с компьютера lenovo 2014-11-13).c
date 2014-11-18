@@ -13,8 +13,6 @@
 #include "config.h"
 /******************************************************************************************************************************/
 IN_ADDR gDestIp;
-extern tWaveFileParams wavParams;
-extern int gWavIsWriting;
 /******************************************************************************************************************************/
 int CbUdpSendMessage(osip_transaction_t * pTransaction, osip_message_t * pMessage, char * pChar, int port, int out_socket)
 {
@@ -124,21 +122,15 @@ int CbOnIstInviteRcvd(int type, osip_transaction_t * pTranaction, osip_message_t
 	//osip_body_set_header(pBody, "m", "audio 5062 RTP/AVP 0 101");
 	//osip_body_set_header(pBody, "a", "rtpmap:0 PCMU/8000/1");
 	//osip_body_to_str(pBody, )
-
 	char pBody2[] = "\
 v=0\r\n\
-o=1415058944 1 IN IP4 192.168.1.50\r\n\
+o=1415058944 1 IN IP4 192.168.43.13\r\n\
 s=sipmore\r\n\
-c=IN IP4 192.168.1.50\r\n\
+c=IN IP4 192.168.43.13\r\n\
 t=0 0\r\n\
-m=audio 5062 RTP/AVP 0\r\n\
+m=audio 7076 RTP/AVP 0\r\n\
 a=rtpmap:0 PCMU/8000\r\n\
-a=rtpmap:101 telephone-event/8000\r\n\
-a=fmtp:101 0-15\r\n\
-a=prime:100\r\n\
 ";
-
-
 //m=audio 5062 RTP/AVP 0\r\n\
 //a=rtpmap:0 PCMU/8000/ 1\r\n\
 //a=rtpmap:110 speex/8000\r\n\	
@@ -197,13 +189,6 @@ int CbOnNistByeRcvd(int type, osip_transaction_t * pTranaction, osip_message_t *
 	evt = osip_new_outgoing_sipmessage(response);
 	osip_message_set_reason_phrase(response, osip_strdup("Ok"));
 	osip_transaction_add_event(pTranaction, evt);
-	
-	if (gWavIsWriting == 1)
-	{
-		FileWavFinish(&wavParams);
-		gWavIsWriting = 0;
-	}
-
 	return 0;
 }
 int CbOnNistCancelRcvd(int type, osip_transaction_t * pTranaction, osip_message_t * pMsg)

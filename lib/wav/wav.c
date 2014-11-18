@@ -6,6 +6,7 @@
 * @brief   WAV file format simple implementation
 ******************************************************************************************************************************/
 #include <stdlib.h>
+#include <assert.h>
 
 //#include <mmsystem.h>
 #include "wav.h"
@@ -75,7 +76,7 @@ int FileWavCreate
 /*****************************************************************************************************************************/
 int FileWavAppendData
 (
-	char* pData,
+	void* pData,
 	unsigned int size, /// in bytes
 	tWaveFileParams* pParams
 )
@@ -83,7 +84,20 @@ int FileWavAppendData
 	errno_t err;
 
 	//err = fopen_s(pParams->ppFile, pFileName, "w"); // Create an empty file for writing. If a file with the same name already exists its content is erased and the file is considered as a new empty file.
-	fwrite(pData, 1, size, pParams->pFile);
+	
+	if (pParams->sampleFormat.significantBitsPerSample == 8)
+	{ 
+		fwrite(pData, 1, size, pParams->pFile);
+	}
+	else if (pParams->sampleFormat.significantBitsPerSample == 16)
+	{
+		fwrite(pData, 1, size, pParams->pFile); // todo
+	}
+	else
+	{
+		assert(0);
+	}
+
 	pParams->_size += size;
 }
 /*****************************************************************************************************************************/

@@ -1,3 +1,10 @@
+/***************************************************************************************************************************//*
+* @file    sip.c
+* @author  Maxim Ivanchenko
+* @version 1.0
+* @date    September, 2014
+* @brief   Libosib2 usage
+******************************************************************************************************************************/
 #include "ip_stack/udp_server.h"
 #include "sip/sip.h"
 #include "sip/callbacks.h"
@@ -5,14 +12,11 @@
 #include "lib/wav/wav.h"
 #include "osip2/osip.h"
 #include "config.h"
-
-//#if defined _WIN32_WINNT_WIN7 
-//#define M_HOME_PC
-//#elif defined(_WIN32_WINNT_WIN8) || defined(_WIN32_WINNT_WINBLUE)
-//#dfine M_WORK_LAPTOP
-//#endif
-
-
+/*****************************************************************************************************************************/
+int gWavIsWriting = 0;
+tWaveFileParams wavParams;
+signed short MuLaw_Decode(char number);
+/*****************************************************************************************************************************/
 void MgsParseTest(pMsg)
 {
 #define PARSE_TEST_1
@@ -48,11 +52,11 @@ void MgsParseTest(pMsg)
 #endif
 }
 SOCKET socket2;
-
+/*****************************************************************************************************************************/
 extern IN_ADDR gDestIp;
-/***********************************************************************************************************************/
-/***********************************************	M	A	I	N	****************************************************/
-/***********************************************************************************************************************/
+/*****************************************************************************************************************************/
+/***************************************************	M	A	I	N	******************************************************/
+/*****************************************************************************************************************************/
 int main(int argc, char ** argv, char ** env)
 {
 	osip_t * pOsip = NULL;
@@ -67,22 +71,31 @@ int main(int argc, char ** argv, char ** env)
 
 	//SOCKET socketTx = UdpServerCreate(&pUdpBuf);
 	int updRecvdSize = 0;
-	char * pSendBuf = "this is glassjaw";
 
 	i = osip_init(&pOsip);
 	if (i != 0)	return -1;
 	SetCallbacks(pOsip);
 
-	unsigned int ds = htonl(0x1234578);
+
+
 	
-	tWaveFileParams wavParams;
 	wavParams.pFileName = "d:\\sipmore.wav";
+#if 0
 	wavParams.sampleFormat.compressionCode = WAV_FMT_COMP_CODE_G711_ULAW;
 	wavParams.sampleFormat.numberOfChannels = 1;
 	wavParams.sampleFormat.significantBitsPerSample = 8;
 	wavParams.sampleFormat.sampleRate = 8000;
 	wavParams.sampleFormat.averageBytesPerSecond = 64000;
-	wavParams.sampleFormat.blockAlign = 1;// SignificantBitsPerSample / 8 * NumChannels
+	wavParams.sampleFormat.blockAlign = 1;// SignificantBitsPerSample / 8 * NumChannels 
+#else
+	wavParams.sampleFormat.compressionCode = WAV_FMT_COMP_CODE_PCM;
+	wavParams.sampleFormat.numberOfChannels = 1;
+	wavParams.sampleFormat.significantBitsPerSample = 16;
+	wavParams.sampleFormat.sampleRate = 8000;
+	wavParams.sampleFormat.averageBytesPerSecond = 128000;
+	wavParams.sampleFormat.blockAlign = 2;// SignificantBitsPerSample / 8 * NumChannels 
+#endif // 0
+
 
 	FileWavCreate(&wavParams);
 	
@@ -132,31 +145,53 @@ int main(int argc, char ** argv, char ** env)
 			for (i = 0; i < 10; i++)
 			{
 				printf("%02X ", rtp.pPayload[i]);
-				//pPrinfStart += sprintf(pPrinfStart, "%02X ", rtp.pPayload[i]);
 			}
 			printf("\r\n");
 			q++;
 
-			if (q==5)
-			{ // send dummy RTP packet back (microphone imitation) to get ACK on it 
-				char *pPacketBack;
-				int packBackLen;
-				RtpCompose(5026, 3545156, rtp.pPayload, rtp.len, &pPacketBack, &packBackLen);
-				UdpSend(pPacketBack, packBackLen, gDestIp, PORT_RTP);
-			}
 			if (q>300)
 			{
+				// stop writing WAV at 300 rtp packets
 				FileWavFinish(&wavParams);
+				gWavIsWriting = 0;
 				return;
 			}
 			else
 			{
+#if 1 // u-law vs pcm
+				unsigned short* pUncompressed = NULL;
+				
+				pUncompressed = (unsigned short*) malloc(updRecvdSize * 2);
+
+				if (pUncompressed == NULL)
+				{
+					FileWavFinish(&wavParams);
+					gWavIsWriting = 0;
+					return;
+				}
+				else
+				{
+					
+					//decode 
+					for (i = 0; i < updRecvdSize; i++)
+					{
+						pUncompressed[i] = MuLaw_Decode(rtp.pPayload[i]);
+					}
+
+					gWavIsWriting = 1;
+					FileWavAppendData(pUncompressed, updRecvdSize*2, &wavParams);
+					free(pUncompressed);
+				}
+
+#else
+				gWavIsWriting = 1;
 				FileWavAppendData(rtp.pPayload, updRecvdSize, &wavParams);
+				free(pUncompressed);
+#endif
+
 			}
 
-
 			RtpPacketDestroy(&rtp);
-
 		}
 		
 		osip_ict_execute(pOsip);
@@ -170,4 +205,4 @@ int main(int argc, char ** argv, char ** env)
 	}
 	return 0;
 }
-
+/*****************************************************************************************************************************/

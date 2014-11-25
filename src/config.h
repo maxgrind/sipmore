@@ -9,21 +9,30 @@
 #define __CONFIG_H__
 /*****************************************************************************************************************************/
 #include <stdio.h>
+
+#ifdef _WIN32
+ #include <stdlib.h>
+#else
+ #define _itoa_s todo
+#endif
 /*****************************************************************************************************************************/
 #define PORT_SIP 5060   
-#define PORT_RTP 5062 // 5062  7076
+#define PORT_RTP 7076 // 5062  7076
 /*****************************************************************************************************************************/
 #define SERV_UDP_PORT 5060//6543
-#define SERV_TCP_PORT 6543
+//#define SERV_TCP_PORT 6543
 
 #ifdef M_HOME_PC
-#define SERV_HOST_ADDR "192.168.1.5"
+#define SERV_IP_ADDR "192.168.1.5"
 #else
-//#define SERV_HOST_ADDR "127.0.0.1"
-#define SERV_HOST_ADDR "192.168.1.50"
-//#define SERV_HOST_ADDR "192.168.43.13"
-//#define SERV_HOST_ADDR "192.168.152.33"
+//#define SERV_IP_ADDR "127.0.0.1"
+#define SERV_IP_ADDR "192.168.1.50"
+//#define SERV_IP_ADDR "192.168.43.13"
+//#define SERV_IP_ADDR "192.168.152.33"
 #endif
+/*****************************************************************************************************************************/
+#define UA_NAME			"sipmore/0.1"
+#define USER_NAME		"MorSvyazAutomatika"
 /*****************************************************************************************************************************/
 #define HTONL(A) ((((unsigned int)(A) & 0xff000000) >> 24) | \
 	(((unsigned int)(A)& 0x00ff0000) >> 8) | \

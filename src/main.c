@@ -5,16 +5,22 @@
 * @date    September, 2014
 * @brief   Libosib2 usage
 ******************************************************************************************************************************/
+#include <assert.h>
+
 #include "ip_stack/udp_server.h"
 #include "sip/sip.h"
 #include "sip/callbacks.h"
 #include "lib/rtp/rtp.h"
 #include "lib/wav/wav.h"
 #include "osip2/osip.h"
+#include "lib/audiostreaming/audiostreaming.h"
 #include "config.h"
 /*****************************************************************************************************************************/
 int gWavIsWriting = 0;
-tWaveFileParams wavParams;
+tWaveFileParams gWavParams;
+tAudioElement gAudioBuf[];
+char gSpdPort[6];
+char gClientIp[13];
 signed short MuLaw_Decode(char number);
 /*****************************************************************************************************************************/
 void MgsParseTest(pMsg)
@@ -30,6 +36,7 @@ void MgsParseTest(pMsg)
 	DWORD bytesRead = 0;
 	errno_t err;
 	char* pData = (char*) osip_malloc(200000);
+
 
 	osip_message_init(&pSip);
 
@@ -59,67 +66,87 @@ extern IN_ADDR gDestIp;
 /*****************************************************************************************************************************/
 int main(int argc, char ** argv, char ** env)
 {
-	osip_t * pOsip = NULL;
-	int i;
-	char* pUdpBuf; 
-	SOCKET sock = UdpServerCreate(&pUdpBuf, PORT_SIP);
+	osip_t *	pOsip			= NULL;
+	// UDP socket for SIP
+	char*		pUdpBuf; 
+	SOCKET		sock			= UdpServerCreate(&pUdpBuf, PORT_SIP);
 	SOCKADDR_IN sockIn;
-
-	char* pRtpBuf;
-	SOCKET sockRtp = UdpServerCreate(&pRtpBuf, PORT_RTP);
+	// UDP socket for RTP
+	char*		pRtpBuf;
+	SOCKET		sockRtp			= UdpServerCreate(&pRtpBuf, PORT_RTP);
 	SOCKADDR_IN sockInRtp;
+	int			udpRecvdSize	= 0;
 
-	//SOCKET socketTx = UdpServerCreate(&pUdpBuf);
-	int updRecvdSize = 0;
+	HANDLE WINAPI playThreadHandle;
+	HANDLE WINAPI palyThreadMutex;
+	int			i;
+
+	_itoa_s(PORT_RTP, gSpdPort, 6, 10); // 6 - max quantity of digits in port value; 10 - radix
 
 	i = osip_init(&pOsip);
-	if (i != 0)	return -1;
+	if (i != 0)
+	{
+		return -1;
+	}
 	SetCallbacks(pOsip);
+	gWavParams.pFileName = "d:\\sipmore.wav";
 
+	gAudioBuf[0].mutex = 0;
+	gAudioBuf[0].handleNeeded = 0;
+	gAudioBuf[1].mutex = 0;
+	gAudioBuf[1].handleNeeded = 0;
 
-
-	
-	wavParams.pFileName = "d:\\sipmore.wav";
 #if 0
-	wavParams.sampleFormat.compressionCode = WAV_FMT_COMP_CODE_G711_ULAW;
-	wavParams.sampleFormat.numberOfChannels = 1;
-	wavParams.sampleFormat.significantBitsPerSample = 8;
-	wavParams.sampleFormat.sampleRate = 8000;
-	wavParams.sampleFormat.averageBytesPerSecond = 64000;
-	wavParams.sampleFormat.blockAlign = 1;// SignificantBitsPerSample / 8 * NumChannels 
+	gWavParams.sampleFormat.compressionCode = WAV_FMT_COMP_CODE_G711_ULAW;
+	gWavParams.sampleFormat.numberOfChannels = 1;
+	gWavParams.sampleFormat.significantBitsPerSample = 8;
+	gWavParams.sampleFormat.sampleRate = 8000;
+	gWavParams.sampleFormat.averageBytesPerSecond = 64000;
+	gWavParams.sampleFormat.blockAlign = 1;// SignificantBitsPerSample / 8 * NumChannels 
 #else
-	wavParams.sampleFormat.compressionCode = WAV_FMT_COMP_CODE_PCM;
-	wavParams.sampleFormat.numberOfChannels = 1;
-	wavParams.sampleFormat.significantBitsPerSample = 16;
-	wavParams.sampleFormat.sampleRate = 8000;
-	wavParams.sampleFormat.averageBytesPerSecond = 128000;
-	wavParams.sampleFormat.blockAlign = 2;// SignificantBitsPerSample / 8 * NumChannels 
+	gWavParams.sampleFormat.compressionCode = WAV_FMT_COMP_CODE_PCM;
+	gWavParams.sampleFormat.numberOfChannels = 1;
+	gWavParams.sampleFormat.significantBitsPerSample = 16;
+	gWavParams.sampleFormat.sampleRate = 8000;
+	gWavParams.sampleFormat.averageBytesPerSecond = 128000;
+	gWavParams.sampleFormat.blockAlign = 2;// SignificantBitsPerSample / 8 * NumChannels 
 #endif // 0
 
+	unsigned int playThreadPArams[2];
+	FileWavCreate(&gWavParams);
 
-	FileWavCreate(&wavParams);
+	//palyThreadMutex = CreateMutex(NULL, 0, NULL);
+	playThreadHandle =  CreateThread(
+		NULL, // this thread wouldn't be inherited
+		0, // stack size in bytes (0 - defualts stack size of 1 Mb)
+		PlaySamplesThread,
+		NULL,
+		0,
+		0
+		);
 	
 	//MgsParseTest();
 	while (1)
 	{
 		// SIP
-		updRecvdSize = UdpServerProcess(sock, pUdpBuf, &sockIn);
-		if (updRecvdSize != 0)
+		udpRecvdSize = UdpServerProcess(sock, pUdpBuf, &sockIn);
+		if (udpRecvdSize != 0)
 		{
-			SipProcess(pOsip, pUdpBuf, updRecvdSize, sock);
+			SipProcess(pOsip, pUdpBuf, udpRecvdSize, sock);
 		}
 
 		// RTP
-		updRecvdSize = UdpServerProcess(sockRtp, pRtpBuf, &sockInRtp);
-		if (updRecvdSize != 0)
+		udpRecvdSize = UdpServerProcess(sockRtp, pRtpBuf, &sockInRtp);
+		if (udpRecvdSize != 0)
 		{
+
 #if 0
-			unsigned char* pBuf = (unsigned char*)malloc(updRecvdSize + 3);
+			unsigned char* pBuf = (unsigned char*)malloc(udpRecvdSize + 3);
 			char* pPrinfStart = pBuf;
-			memcpy(pBuf, pRtpBuf, updRecvdSize);
+			memcpy(pBuf, pRtpBuf, udpRecvdSize);
 
 #if 1 
-			for (i = 0; i < updRecvdSize; i++)
+			for (i = 0; i < udpRecvdSize; i++)
 			{
 				//printf("0x%02x", pBuf[i]);
 				//printf("%#2x ", pBuf[i]);
@@ -127,19 +154,21 @@ int main(int argc, char ** argv, char ** env)
 				//printf("%d ", pBuf[i]);
 			}
 #else
-			for (i = 0; i < updRecvdSize; i++)
+			for (i = 0; i < udpRecvdSize; i++)
 			{
 				pPrinfStart += sprintf(pPrinfStart, "%02X", pBuf[i]);
 			}
 #endif
-			//printf("%d\r\n", updRecvdSize);
+			//printf("%d\r\n", udpRecvdSize);
 			printf("\r\n");
 #endif // 0
 			tRtpPacket rtp;
 			char* pPrinfStart;
 			static int q = 0;
+			unsigned short* pUncompressed = NULL;
+			//pUncompressed = (unsigned short*) malloc(udpRecvdSize * 2);
 
-			RtpParse(pRtpBuf, updRecvdSize, &rtp);
+			RtpParse(pRtpBuf, udpRecvdSize, &rtp);
 			pPrinfStart = rtp.pPayload;
 			printf("%d: ", rtp.header.ts);
 			for (i = 0; i < 10; i++)
@@ -149,48 +178,87 @@ int main(int argc, char ** argv, char ** env)
 			printf("\r\n");
 			q++;
 
-			if (q>300)
+			//if (q>300)
+			//{
+			//	// stop writing WAV at 300 rtp packets
+			//	FileWavFinish(&gWavParams);
+			//	gWavIsWriting = 0;
+			//	return;
+			//}
+			//else
+			//{
+//#if 0 // u-law vs pcm
+//
+//				
+//				pUncompressed = (unsigned short*) malloc(udpRecvdSize * 2);
+//
+//				if (pUncompressed == NULL)
+//				{
+//					FileWavFinish(&gWavParams);
+//					gWavIsWriting = 0;
+//					return;
+//				}
+//				else
+//				{
+//					
+//					//decode 
+//					for (i = 0; i < udpRecvdSize; i++)
+//					{
+//						pUncompressed[i] = MuLaw_Decode(rtp.pPayload[i]);
+//					}
+//
+//					gWavIsWriting = 1;
+//					FileWavAppendData(pUncompressed, udpRecvdSize*2, &gWavParams);
+//					free(pUncompressed);
+//				}
+//
+//#else
+//				gWavIsWriting = 1;
+//				FileWavAppendData(rtp.pPayload, udpRecvdSize, &gWavParams);
+//				free(pUncompressed);
+//#endif
+
+			//}
+#if 0 // writing wav file
+
+			//decode 
+			for (i = 0; i < udpRecvdSize; i++)
 			{
-				// stop writing WAV at 300 rtp packets
-				FileWavFinish(&wavParams);
-				gWavIsWriting = 0;
-				return;
+				pUncompressed[i] = MuLaw_Decode(rtp.pPayload[i]);
+			}
+			FileWavAppendData(pUncompressed, udpRecvdSize * 2, &gWavParams);
+			
+#else // stream playing
+			if (((&gAudioBuf[0])->mutex == 0) && ((&gAudioBuf[0])->handleNeeded != 1))
+			{
+				(&gAudioBuf[0])->mutex = 1;
+				for (i = 0; i < udpRecvdSize; i++)
+				{
+					(&gAudioBuf[0])->buffer[i] = MuLaw_Decode(rtp.pPayload[i]);
+				}
+				(&gAudioBuf[0])->sizeInBytes = udpRecvdSize;
+				(&gAudioBuf[0])->handleNeeded = 1;
+				(&gAudioBuf[0])->mutex = 0;
+			}
+			else if (((&gAudioBuf[1])->mutex == 0) && ((&gAudioBuf[1])->handleNeeded != 1))
+			{
+				(&gAudioBuf[1])->mutex = 1;
+				for (i = 0; i < udpRecvdSize; i++)
+				{
+					(&gAudioBuf[1])->buffer[i] = MuLaw_Decode(rtp.pPayload[i]);
+				}
+				(&gAudioBuf[1])->sizeInBytes = udpRecvdSize;
+				(&gAudioBuf[1])->handleNeeded = 1;
+				(&gAudioBuf[1])->mutex = 0;
 			}
 			else
 			{
-#if 1 // u-law vs pcm
-				unsigned short* pUncompressed = NULL;
-				
-				pUncompressed = (unsigned short*) malloc(updRecvdSize * 2);
-
-				if (pUncompressed == NULL)
-				{
-					FileWavFinish(&wavParams);
-					gWavIsWriting = 0;
-					return;
-				}
-				else
-				{
-					
-					//decode 
-					for (i = 0; i < updRecvdSize; i++)
-					{
-						pUncompressed[i] = MuLaw_Decode(rtp.pPayload[i]);
-					}
-
-					gWavIsWriting = 1;
-					FileWavAppendData(pUncompressed, updRecvdSize*2, &wavParams);
-					free(pUncompressed);
-				}
-
-#else
-				gWavIsWriting = 1;
-				FileWavAppendData(rtp.pPayload, updRecvdSize, &wavParams);
-				free(pUncompressed);
-#endif
-
+			//	assert(0);
 			}
 
+
+#endif
+			free(pUncompressed);
 			RtpPacketDestroy(&rtp);
 		}
 		

@@ -5,15 +5,19 @@
  * @date    September, 2014
  * @brief   RFC3550 RTP protocol implementation  
 ******************************************************************************************************************************/
+#include <assert.h>
 #include "ip_stack/udp_server.h"
 #include "sip/sip.h"
 #include "lib/rtp/rtp.h"
 #include "lib/wav/wav.h"
 #include "osip2/osip.h"
+#include "osipparser2/sdp_message.h"
 #include "config.h"
 /******************************************************************************************************************************/
 IN_ADDR gDestIp;
-extern tWaveFileParams wavParams;
+extern char gSpdPort[6];
+// extern char gClientIp[13];
+extern tWaveFileParams gWavParams;
 extern int gWavIsWriting;
 /******************************************************************************************************************************/
 int CbUdpSendMessage(osip_transaction_t * pTransaction, osip_message_t * pMessage, char * pChar, int port, int out_socket)
@@ -88,9 +92,11 @@ int CbRcvdClientNotInvite3456xx(int type, osip_transaction_t * pTranaction, osip
 /***********************************************************************************************************************/
 int CbOnIstInviteRcvd(int type, osip_transaction_t * pTranaction, osip_message_t * pMsg)
 {
+	osip_message_t* msgParsed = NULL;
 	osip_message_t *response = NULL;
 	osip_event_t *evt = NULL;
 	osip_body_t* pBody;
+	sdp_message_t* pSdpMsgInput = NULL;
 	int bodyLen = 0;
 
 	//BuildResponse(pMsg, &response);//trying
@@ -104,6 +110,30 @@ int CbOnIstInviteRcvd(int type, osip_transaction_t * pTranaction, osip_message_t
 	//evt = osip_new_outgoing_sipmessage(response);
 	//osip_message_set_reason_phrase(response, osip_strdup("Dialog Establishement"));
 	//osip_transaction_add_event(pTranaction, evt);
+	int bodiesQntty = pMsg->bodies.nb_elt;
+	int* pPackedSdpMsg = pMsg->bodies.node->element;
+	//char* pSdp = *pPackedSdpMsg;
+
+	sdp_message_init(&pSdpMsgInput);
+	sdp_message_parse(pSdpMsgInput, *pPackedSdpMsg); // (const char*)
+	//strcpy((char*)gDestIp, pSdpMsgInput->o_addr);
+	// parse UDP port for SDP
+	sdp_media_t* pSdpMedia;
+
+	sdp_media_init(&pSdpMedia);
+	char* pSdpMediaType = (char*) osip_malloc(20);
+	pSdpMediaType = sdp_message_m_media_get(pSdpMsgInput, 0);
+	int zeroMeansEqual = strcmp(pSdpMediaType, "audio");
+	//osip_free(pSdpMediaType);
+	if (zeroMeansEqual != 0)
+	{
+		// todo: send CANCEL
+		printf("Other than \"audio\" format received. Not supported for now");
+	}
+
+	char* pSdpPort = (char*) osip_malloc(20);
+	pSdpPort = sdp_message_m_port_get(pSdpMsgInput, 0);
+	strcpy(gSpdPort, pSdpPort);
 
 	BuildResponse(pMsg, &response);//ringing
 	osip_message_set_status_code(response, SIP_RINGING);
@@ -113,31 +143,64 @@ int CbOnIstInviteRcvd(int type, osip_transaction_t * pTranaction, osip_message_t
 
 	BuildResponse(pMsg, &response);//ok
 	osip_message_set_status_code(response, SIP_OK);
+
 	osip_body_init(&pBody);
 
 	osip_message_set_content_type(response, "application/sdp");
+
+	sdp_message_t* pSdp;
+	sdp_message_init(&pSdp);
+	sdp_message_v_version_set(pSdp, osip_strdup("0"));
+	sdp_message_o_origin_set(pSdp, osip_strdup(USER_NAME), osip_strdup("281085"), osip_strdup("0"), osip_strdup("0"), osip_strdup("IP4"), osip_strdup(SERV_IP_ADDR));
+	sdp_message_s_name_set(pSdp, osip_strdup(UA_NAME));
+	sdp_message_t_time_descr_add(pSdp, osip_strdup("0"), osip_strdup("0"));
+	//sdp_message_c_connection_add(pSdp, 0, osip_strdup("IN"), osip_strdup("IP4"), osip_strdup(SERV_IP_ADDR), NULL, NULL);
+	sdp_message_m_media_add(pSdp, osip_strdup("audio"), osip_strdup(pSdpPort), NULL, osip_strdup("RTP/AVP 0 101")); // todo:  0 101??
+	sdp_message_m_payload_add(pSdp, 1, osip_strdup("rtpmap:0 PCMU/8000/1"));
+	sdp_message_m_payload_add(pSdp, 2, osip_strdup("rtpmap:101 telephone-event/8000"));
+	sdp_message_m_payload_add(pSdp, 3, osip_strdup("fmtp:101 0-15"));
+	sdp_message_m_payload_add(pSdp, 4, osip_strdup("prime:100"));
+	sdp_message_c_connection_add(pSdp, 0, osip_strdup("IN"), osip_strdup("IP4"), osip_strdup(SERV_IP_ADDR), NULL, NULL); // why here, after media?
+
+	//osip_free(pSdpPort);
+
+	char* pSdpStr = NULL;
+	sdp_message_to_str(pSdp, &pSdpStr);
+	if (pSdpStr != NULL)
+	{
+		osip_message_set_body(response, pSdpStr, strlen(pSdpStr));
+		osip_free(pSdpStr);
+	}
+	else
+	{
+	}
 	//osip_message_set_content_length(response, "128");
 
 	//osip_body_set_header(pBody, "v", "0");
-	//osip_body_set_header(pBody, "o", "-1415058944 1 IN IP4 192.168.1.5");
+	//osip_body_set_header(pBody, "o", "-1415058944 1 IN IP4 192.168.43.13");
 	//osip_body_set_header(pBody, "c", "IN IP4 192.168.1.5");
 	//osip_body_set_header(pBody, "m", "audio 5062 RTP/AVP 0 101");
 	//osip_body_set_header(pBody, "a", "rtpmap:0 PCMU/8000/1");
-	//osip_body_to_str(pBody, )
 
-	char pBody2[] = "\
-v=0\r\n\
-o=1415058944 1 IN IP4 192.168.1.50\r\n\
-s=sipmore\r\n\
-c=IN IP4 192.168.1.50\r\n\
-t=0 0\r\n\
-m=audio 5062 RTP/AVP 0\r\n\
-a=rtpmap:0 PCMU/8000\r\n\
-a=rtpmap:101 telephone-event/8000\r\n\
-a=fmtp:101 0-15\r\n\
-a=prime:100\r\n\
-";
+	//char* pBodyString = NULL;
+	//int bodyStringSize = 0;
 
+	//osip_message_set_body(response, )
+	//osip_body_to_str(pBody, &pBodyString, &bodyStringSize);
+
+//	char pBody2[] = "\
+//v=0\r\n\
+//o=1415058944 1 IN IP4 192.168.43.13\r\n\
+//s=sipmore\r\n\
+//c=IN IP4 192.168.43.13\r\n\
+//t=0 0\r\n\
+//m=audio 5062 RTP/AVP 0\r\n\
+//a=rtpmap:0 PCMU/8000\r\n\
+//a=rtpmap:101 telephone-event/8000\r\n\
+//a=fmtp:101 0-15\r\n\
+//a=prime:100\r\n\
+//";
+	//strcat
 
 //m=audio 5062 RTP/AVP 0\r\n\
 //a=rtpmap:0 PCMU/8000/ 1\r\n\
@@ -160,9 +223,9 @@ a=prime:100\r\n\
 	// 5062 7076 
 	// 192.168.1.5  192.168.43.13
 
-	pBody->length = sizeof(pBody2);//128;
+	//pBody->length = sizeof(pBody2);//128;
 
-	osip_message_set_body(response, pBody2, sizeof(pBody2)-1);
+	//osip_message_set_body(response, pBody2, sizeof(pBody2)-1);
 
 	evt = osip_new_outgoing_sipmessage(response);
 	osip_message_set_reason_phrase(response, osip_strdup("Ok"));
@@ -200,7 +263,7 @@ int CbOnNistByeRcvd(int type, osip_transaction_t * pTranaction, osip_message_t *
 	
 	if (gWavIsWriting == 1)
 	{
-		FileWavFinish(&wavParams);
+		FileWavFinish(&gWavParams);
 		gWavIsWriting = 0;
 	}
 

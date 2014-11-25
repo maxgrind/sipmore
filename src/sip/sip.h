@@ -3,7 +3,7 @@
 * @author  Maxim Ivanchenko
 * @version 1.0
 * @date    September, 2014
-* @brief   Libosib2 usage
+* @brief   Libosib2 sip usage
 ******************************************************************************************************************************/
 #pragma once
 #include "osip2/osip.h"

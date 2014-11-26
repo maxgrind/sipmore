@@ -38,16 +38,11 @@ WAVERR_BADFORMAT = 32,
 WAVERR_STILLPLAYING = 33,
 WAVERR_UNPREPARED = 34 */
 
-
-#define SOUNDBUFF 65536  //16958258//43666//655360
 WAVEFORMATEX	wf;
 WAVEHDR			whdr;
 HWAVEOUT		hWaveOut;
 LPSTR			lpData;
 MMRESULT		mmRes;
-
-short clpData[SOUNDBUFF/2];
-//char clpData[SOUNDBUFF];
 
 // double buffer
 #define AUDIO_FIFO_LEN	2
@@ -84,14 +79,15 @@ void PlaySamples(void* buffer, unsigned int sizeInBytes)
 	wf.nChannels = 1;
 	wf.nSamplesPerSec = 8000;
 	wf.wBitsPerSample = 16;
-	wf.nAvgBytesPerSec = wf.nSamplesPerSec * wf.wBitsPerSample * wf.nChannels;
+	wf.nAvgBytesPerSec = wf.nSamplesPerSec * wf.wBitsPerSample/2 * wf.nChannels;
 	wf.nBlockAlign = 1;
 	wf.cbSize = 0;
 
 	whdr.lpData = buffer;
 	whdr.dwBufferLength = sizeInBytes;
-	whdr.dwFlags = WHDR_BEGINLOOP;
-	whdr.dwLoops = 1;
+	//whdr.dwFlags = WHDR_BEGINLOOP;
+	whdr.dwFlags = WHDR_BEGINLOOP | WHDR_ENDLOOP | WHDR_PREPARED;
+	whdr.dwLoops = 0;
 
 
 	mmRes = waveOutOpen(&hWaveOut, WAVE_MAPPER, &wf, 0, 0, CALLBACK_NULL); // WAVE_MAPPED_DEFAULT_COMMUNICATION_DEVICE 
@@ -103,7 +99,9 @@ void PlaySamples(void* buffer, unsigned int sizeInBytes)
 
 	mmRes = waveOutPrepareHeader(hWaveOut, &whdr, sizeof(whdr));
 	mmRes = waveOutWrite(hWaveOut, &whdr, sizeof(whdr));
+
 	while (!(whdr.dwFlags & WHDR_DONE));
+
 	mmRes = waveOutUnprepareHeader(hWaveOut, &whdr, sizeof(whdr));
 	mmRes = waveOutClose(hWaveOut);
 

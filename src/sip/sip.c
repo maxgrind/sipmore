@@ -15,14 +15,19 @@
 /*****************************************************************************************************************************/
 void SipProcess(osip_t* osip, char* pBuf, int size, SOCKET sock)
 {
-	osip_event_t *evt = osip_parse(pBuf, size);
+	osip_event_t *evt = osip_parse(pBuf, size); // doesn't need to be free
 	int rc;
-	char firstLetter = pBuf[0];
+
+	if (evt == NULL)
+	{
+		OutputDebugString(TEXT("unknown message received\r\n"));
+		return;
+	}
 
 	rc = osip_find_transaction_and_add_event(osip, evt);
 	if (0 != rc)
 	{
-		OutputDebugString(TEXT("this event has no transaction, create a new one."));
+		OutputDebugString(TEXT("this event has no transaction, create a new one\r\n"));
 		if(evt->type == RCV_REQINVITE)
 		{
 			ProcessNewReqIst(osip, evt, sock);
@@ -30,7 +35,6 @@ void SipProcess(osip_t* osip, char* pBuf, int size, SOCKET sock)
 		else
 		{
 			ProcessNewReqNist(osip, evt, sock);
-
 		};
 	}
 }
@@ -58,10 +62,8 @@ int BuildResponse(const osip_message_t *request, osip_message_t **response)
 {
 	osip_message_t *msg = NULL;
 	char port[6];
-	osip_message_init(&msg);
 	char* pContact = osip_malloc(strlen(SERV_IP_ADDR) + strlen(USER_NAME) + sizeof(port) + 7 + 10 ); // 7 is "sip:...@..:. \0"    10 - zapas
-
-
+	osip_message_init(&msg);
 
 	osip_from_clone(request->from, &msg->from);
 	osip_to_clone(request->to, &msg->to);
@@ -92,13 +94,6 @@ int BuildResponse(const osip_message_t *request, osip_message_t **response)
 	strcat(pContact, osip_strdup(USER_NAME));
 	strcat(pContact, osip_strdup("@"));
 	strcat(pContact, osip_strdup(SERV_IP_ADDR));
-	//strcat(pContact, osip_strdup(":"));
-	//strcat(pContact, osip_strdup(gSpdPort));
-
-	//osip_message_set_contact(msg, osip_strdup("sip:pc@192.168.1.50"));
-	//char* pContactStr = NULL;
-	//osip_contact_to_str(pContact, &pContactStr);
-	//osip_message_set_contact(msg, osip_strdup(pContactStr));
 	osip_message_set_contact(msg, osip_strdup(pContact));
 	
 	osip_free(pContact);

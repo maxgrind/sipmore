@@ -48,7 +48,7 @@ MMRESULT		mmRes;
 #define AUDIO_FIFO_LEN	2
 tAudioElement gAudioBuf[AUDIO_FIFO_LEN];
 /***************************************************************************************************************************//*
-* @brief
+* @brief Thread for playing samples received through RTP
 ******************************************************************************************************************************/
 DWORD WINAPI PlaySamplesThread(LPVOID p)
 {
@@ -71,23 +71,24 @@ DWORD WINAPI PlaySamplesThread(LPVOID p)
 	
 }
 /***************************************************************************************************************************//*
-* @brief 
+* @brief Play samples received through RTP
 ******************************************************************************************************************************/
-void PlaySamples(void* buffer, unsigned int sizeInBytes)
+void PlaySamples(signed short* buffer, unsigned int sizeInBytes)
 {
 	wf.wFormatTag = WAVE_FORMAT_PCM;
 	wf.nChannels = 1;
 	wf.nSamplesPerSec = 8000;
 	wf.wBitsPerSample = 16;
-	wf.nAvgBytesPerSec = wf.nSamplesPerSec * wf.wBitsPerSample/2 * wf.nChannels;
-	wf.nBlockAlign = 1;
+	wf.nBlockAlign = wf.nChannels * (wf.wBitsPerSample / 8);
+	wf.nAvgBytesPerSec = wf.nSamplesPerSec * wf.nBlockAlign;
+	//wf.nAvgBytesPerSec = wf.nSamplesPerSec * wf.wBitsPerSample / 8 * wf.nChannels; //8000 * 2;//
 	wf.cbSize = 0;
 
-	whdr.lpData = buffer;
-	whdr.dwBufferLength = sizeInBytes;
+	whdr.lpData = (LPSTR)buffer;
+	whdr.dwBufferLength = (DWORD) sizeInBytes;
 	//whdr.dwFlags = WHDR_BEGINLOOP;
 	whdr.dwFlags = WHDR_BEGINLOOP | WHDR_ENDLOOP | WHDR_PREPARED;
-	whdr.dwLoops = 0;
+	whdr.dwLoops = 1;
 
 
 	mmRes = waveOutOpen(&hWaveOut, WAVE_MAPPER, &wf, 0, 0, CALLBACK_NULL); // WAVE_MAPPED_DEFAULT_COMMUNICATION_DEVICE 
@@ -109,7 +110,7 @@ void PlaySamples(void* buffer, unsigned int sizeInBytes)
 /***************************************************************************************************************************//*
 * @brief 
 ******************************************************************************************************************************/
-unsigned int CbRecordSamples(void* buffer);
+unsigned int CbRecordSamples(signed short* buffer);
 /*****************************************************************************************************************************/
 
 #endif

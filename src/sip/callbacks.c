@@ -19,6 +19,7 @@ extern char gSpdPort[6];
 // extern char gClientIp[13];
 extern tWaveFileParams gWavParams;
 extern int gWavIsWriting;
+extern osip_t* gpOsip;
 /******************************************************************************************************************************/
 int CbUdpSendMessage(osip_transaction_t * pTransaction, osip_message_t * pMessage, char * pChar, int port, int out_socket)
 {
@@ -32,16 +33,21 @@ int CbUdpSendMessage(osip_transaction_t * pTransaction, osip_message_t * pMessag
 /******************************************************************************************************************************/
 void CbKillTransactionClientInvite(int type, osip_transaction_t * pTranaction, osip_message_t * pMsg)
 {
-	
+	int i;
+	return;
 }
 void CbKillTransactionServerInvite(int type, osip_transaction_t * pTranaction, osip_message_t * pMsg)
 {
 	int i;
-	//int i = osip_remove_transaction(pOsip, pTranaction);
+	if (gpOsip != NULL)
+	{
+		i = osip_remove_transaction(gpOsip, pTranaction);
+	}
 	return;
 }
 void CbKillTransactionClientNotInvite(int type, osip_transaction_t * pTranaction, osip_message_t * pMsg)
 {
+	int i;
 	return;
 }
 void CbKillTransactionServerNotInvite(int type, osip_transaction_t * pTranaction, osip_message_t * pMsg)
@@ -51,6 +57,7 @@ void CbKillTransactionServerNotInvite(int type, osip_transaction_t * pTranaction
 }
 void CbTransportErrorClientInvite(int type, osip_transaction_t * pTranaction, osip_message_t * pMsg)
 {
+	int i;
 	return;
 }
 void CbTransportErrorServerInvite(int type, osip_transaction_t * pTranaction, osip_message_t * pMsg)
@@ -97,41 +104,35 @@ int CbOnIstInviteRcvd(int type, osip_transaction_t * pTranaction, osip_message_t
 	osip_event_t *evt = NULL;
 	osip_body_t* pBody;
 	sdp_message_t* pSdpMsgInput = NULL;
+
 	int bodyLen = 0;
-
-	//BuildResponse(pMsg, &response);//trying
-	//osip_message_set_status_code(response, SIP_TRYING);
-	//evt = osip_new_outgoing_sipmessage(response);
-	//osip_message_set_reason_phrase(response, osip_strdup("Trying"));
-	//osip_transaction_add_event(pTranaction, evt);
-
-	//BuildResponse(pMsg, &response);//dialog establishement
-	//osip_message_set_status_code(response, 101);
-	//evt = osip_new_outgoing_sipmessage(response);
-	//osip_message_set_reason_phrase(response, osip_strdup("Dialog Establishement"));
-	//osip_transaction_add_event(pTranaction, evt);
 	int bodiesQntty = pMsg->bodies.nb_elt;
 	int* pPackedSdpMsg = pMsg->bodies.node->element;
-	//char* pSdp = *pPackedSdpMsg;
+
+
+	sdp_media_t* pSdpMedia;
+	char* pSdpMediaType = (char*) osip_malloc(20);
+	int zeroMeansEqual;
+
+	char* pSdpPort = (char*) osip_malloc(20);
+	char* pSdpStr = NULL;
 
 	sdp_message_init(&pSdpMsgInput);
 	sdp_message_parse(pSdpMsgInput, *pPackedSdpMsg); // (const char*)
-	//strcpy((char*)gDestIp, pSdpMsgInput->o_addr);
-	// parse UDP port for SDP
-	sdp_media_t* pSdpMedia;
+
 
 	sdp_media_init(&pSdpMedia);
-	char* pSdpMediaType = (char*) osip_malloc(20);
 	pSdpMediaType = sdp_message_m_media_get(pSdpMsgInput, 0);
-	int zeroMeansEqual = strcmp(pSdpMediaType, "audio");
-	//osip_free(pSdpMediaType);
+
+	zeroMeansEqual = strcmp(pSdpMediaType, "audio");
+	osip_free(pSdpMediaType);
 	if (zeroMeansEqual != 0)
 	{
 		// todo: send CANCEL
 		printf("Other than \"audio\" format received. Not supported for now");
 	}
 
-	char* pSdpPort = (char*) osip_malloc(20);
+
 	pSdpPort = sdp_message_m_port_get(pSdpMsgInput, 0);
 	strcpy(gSpdPort, pSdpPort);
 
@@ -161,10 +162,8 @@ int CbOnIstInviteRcvd(int type, osip_transaction_t * pTranaction, osip_message_t
 	sdp_message_m_payload_add(pSdp, 3, osip_strdup("fmtp:101 0-15"));
 	sdp_message_m_payload_add(pSdp, 4, osip_strdup("prime:100"));
 	sdp_message_c_connection_add(pSdp, 0, osip_strdup("IN"), osip_strdup("IP4"), osip_strdup(SERV_IP_ADDR), NULL, NULL); // why here, after media?
+	osip_free(pSdpPort);
 
-	//osip_free(pSdpPort);
-
-	char* pSdpStr = NULL;
 	sdp_message_to_str(pSdp, &pSdpStr);
 	if (pSdpStr != NULL)
 	{
@@ -243,8 +242,8 @@ int CbOnIstAckRcvd(int type, osip_transaction_t * pTranaction, osip_message_t * 
 	evt = osip_new_outgoing_sipmessage(response);
 	osip_message_set_reason_phrase(response, osip_strdup("Ok"));
 	osip_transaction_add_event(pTranaction, evt);
-	return 0;
 
+	return 0;
 }
 int CbOnNistRegisterRcvd(int type, osip_transaction_t * pTranaction, osip_message_t * pMsg)
 {
@@ -301,7 +300,7 @@ void SetCallbacks(osip_t* osip)
 	osip_set_cb_send_message(osip, CbUdpSendMessage);
 	// callback called when a SIP transaction is TERMINATED.
 	osip_set_kill_transaction_callback(osip, OSIP_ICT_KILL_TRANSACTION, CbKillTransactionClientInvite);
-	osip_set_kill_transaction_callback(osip, OSIP_NIST_KILL_TRANSACTION, CbKillTransactionServerInvite);
+	osip_set_kill_transaction_callback(osip, OSIP_IST_KILL_TRANSACTION, CbKillTransactionServerInvite);
 	osip_set_kill_transaction_callback(osip, OSIP_NICT_KILL_TRANSACTION, CbKillTransactionClientNotInvite);
 	osip_set_kill_transaction_callback(osip, OSIP_NIST_KILL_TRANSACTION, CbKillTransactionServerNotInvite);
 	// callback called when the callback to send message have failed.

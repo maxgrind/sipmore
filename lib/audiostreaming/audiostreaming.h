@@ -12,12 +12,12 @@
 /*****************************************************************************************************************************/
 DWORD WINAPI PlaySamplesThread(LPVOID t);
 /*****************************************************************************************************************************/
-void PlaySamples(void* buffer, unsigned int sizeInBytes);
+void PlaySamples(signed short* buffer, unsigned int sizeInBytes);
 /*****************************************************************************************************************************/
 typedef struct sAudioStreaming
 {
-	void(*CbPlaySamples)(void* buffer, unsigned int sizeInBytes);
-	unsigned int(*CbRecordSamples)(void* buffer);
+	//void(*CbPlaySamples)(signed short* buffer, unsigned int sizeInBytes);
+	//unsigned int(*CbRecordSamples)(signed short* buffer);
 	struct sAudioConfig
 	{
 		unsigned int numOfChannels;
@@ -32,7 +32,7 @@ typedef struct sAudioElement
 {
 	char mutex;
 	char handleNeeded;
-	short buffer[1600];
+	signed short buffer[1600];
 	int sizeInBytes;
 }
 tAudioElement;

@@ -7,7 +7,6 @@
 //#include <arpa/inet.h>
 #include "udp_server.h"
 
-
 extern IN_ADDR gDestIp;
 
 #if 0

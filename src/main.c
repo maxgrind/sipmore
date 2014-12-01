@@ -18,54 +18,18 @@
 #include "lib/audiostreaming/audiostreaming.h"
 #include "lib/codec/g711/itu/g711itu.h"
 /*****************************************************************************************************************************/
-int gWavIsWriting = 0;
+int				gWavIsWriting = 0;
 tWaveFileParams gWavParams;
-tAudioElement gAudioBuf[];
-osip_t* gpOsip;
-char gSpdPort[6];
-char gClientIp[13];
-signed short MuLaw_Decode(char number);
-HANDLE WINAPI gPlayThreadHandle;
-HANDLE WINAPI gPalyThreadMutex[2];
-/*****************************************************************************************************************************/
-void MgsParseTest(pMsg)
-{
-#define PARSE_TEST_1
-	osip_message_t sip;
-	osip_message_t* pSip;
-	const char* fileName = "C:\\m\\Dropbox\\_sip_proxy\\input\\sip01m";
-	FILE* handle; 
-#if defined PARSE_TEST_1
-
-	DWORD fileSizeInBytes;
-	DWORD bytesRead = 0;
-	errno_t err;
-	char* pData = (char*) osip_malloc(200000);
-
-
-	osip_message_init(&pSip);
-
-	err = fopen_s(&handle, fileName, "rb");
-	fseek(handle, 0, SEEK_END); // set internal pointer to the end of file 
-	fileSizeInBytes = ftell(handle); // size in bytes
-	fseek(handle, 0, SEEK_SET); // put the pointer back to the beginnig
-	bytesRead = fread(pData, 1, 200000, handle);
-	//osip_message_parse(&sip, pData, bytesRead);
-	osip_message_parse(pSip, pData, bytesRead);
-	pSip = pSip;
-#elif defined PARSE_TEST_2
-
-	DWORD fileSizeInBytes;
-	DWORD bytesRead = 0;
-	errno_t err;
-	char* pData = (char*) osip_malloc(200000);
-
-	err = fopen_s(&handle, fileName, "rb");
-#endif
-}
-SOCKET socket2;
+tAudioElement	gAudioBuf[];
+osip_t*			gpOsip;
+char			gSpdPort[6];
+char			gClientIp[13];
+HANDLE WINAPI	gPlayThreadHandle;
+HANDLE WINAPI	gPalyThreadMutex[2];
 /*****************************************************************************************************************************/
 extern IN_ADDR gDestIp;
+/*****************************************************************************************************************************/
+signed short	MuLaw_Decode(char number);
 /*****************************************************************************************************************************/
 /***************************************************	M	A	I	N	******************************************************/
 /*****************************************************************************************************************************/
@@ -131,7 +95,6 @@ int main(int argc, char ** argv, char ** env)
 		0
 		);
 	
-	//MgsParseTest();
 	while (1)
 	{
 		// SIP

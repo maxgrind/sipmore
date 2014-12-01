@@ -1,7 +1,7 @@
 ﻿/***************************************************************************************************************************//*
  * @file    audiostreaming.h
  * @author  Maxim Ivanchenko
- * @brief     
+ * @brief   Audiostreaming for WindowsNT using waveXxx API
 ******************************************************************************************************************************/
 #ifndef __AUDIOSTREAMING_H__
 #define __AUDIOSTREAMING_H__

@@ -1,8 +1,6 @@
 /***************************************************************************************************************************//*
  * @file    rtp.c
  * @author  Maxim Ivanchenko
- * @version 1.0
- * @date    November, 2014
  * @brief   RFC3550 RTP protocol implementation  
 ******************************************************************************************************************************/
 #include <stdlib.h> 
@@ -14,7 +12,8 @@ int RtpParse(char *pData, int len, tRtpPacket* pRtp)
 {
 	int payloadLen = 0;
 	char *pPayload = NULL;
-	pRtp->header.version= (pData[0] >> 6) & 0x00000003;
+	pRtp->header.version = (pData[0] >> 6) & 0x00000003;
+
 	pRtp->header.p = (pData[0] >> 5) & 0x00000001;
 	pRtp->header.x = (pData[0] >> 4) & 0x00000001;
 	pRtp->header.cc = pData[0] & 0x0000000F;
@@ -27,8 +26,13 @@ int RtpParse(char *pData, int len, tRtpPacket* pRtp)
 	pRtp->pPayload = (char*) malloc(payloadLen);
 	if (pRtp->pPayload == NULL) return 0;
 	memcpy(pRtp->pPayload, &pData[len - payloadLen], payloadLen);
-	pRtp->len = payloadLen;
+	pRtp->payloadLen = payloadLen;
 
+	if (pRtp->header.version != 2)
+	{
+		return -1;
+	}
+	return 0;
 }
 /***************************************************************************************************************************//*
 * @brief Composng RTP packet. pData is big-endian input data. RtpPacketDestroy must be called to free pRtp->pPayload

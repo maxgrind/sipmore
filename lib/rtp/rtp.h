@@ -1,8 +1,6 @@
 /***************************************************************************************************************************//*
  * @file    rtp.h
  * @author  Maxim Ivanchenko
- * @version 1.0
- * @date    November, 2014
  * @brief   RFC3550 RTP protocol implementation  
 ******************************************************************************************************************************/
 #ifndef __RTP_H__
@@ -26,7 +24,7 @@ typedef struct sRtpPacket
 	tRtpHeader header;
 	unsigned int csrc[16];	// optional contributing source (CSRC) identifiers
 	char *pPayload;
-	int len; // payload length in bytes
+	int payloadLen; // payload length in bytes
 }
 tRtpPacket;
 /*****************************************************************************************************************************/

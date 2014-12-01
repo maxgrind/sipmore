@@ -1,18 +1,18 @@
 ﻿/***************************************************************************************************************************//*
- * @file    wav.h
+ * @file    audiostreaming.h
  * @author  Maxim Ivanchenko
- * @version 1.0
- * @date    November, 2014
  * @brief     
 ******************************************************************************************************************************/
 #ifndef __AUDIOSTREAMING_H__
 #define __AUDIOSTREAMING_H__
 /*****************************************************************************************************************************/
+#define AUDIO_ELEMENT_BUFFER_LEN  1600 // elements of short
+/*****************************************************************************************************************************/
+#include <windows.h> // Mmsystem.h
 #include <stdio.h>
-/*****************************************************************************************************************************/
-DWORD WINAPI PlaySamplesThread(LPVOID t);
-/*****************************************************************************************************************************/
-void PlaySamples(signed short* buffer, unsigned int sizeInBytes);
+#include <string.h>
+#pragma comment(lib,"winmm") 
+#include "lib/wav/wav.h"
 /*****************************************************************************************************************************/
 typedef struct sAudioStreaming
 {
@@ -23,6 +23,7 @@ typedef struct sAudioStreaming
 		unsigned int numOfChannels;
 		unsigned int samplesPerSec;
 		unsigned int bitsPerSample;
+		
 	}
 	tAudioConfig;
 }
@@ -30,12 +31,28 @@ tAudioStreaming;
 /*****************************************************************************************************************************/
 typedef struct sAudioElement
 {
+	//HANDLE WINAPI winapiMutex;
 	char mutex;
 	char handleNeeded;
-	signed short buffer[1600];
+	signed short buffer[AUDIO_ELEMENT_BUFFER_LEN];
 	int sizeInBytes;
+
+	//waveXxx types
+	struct sWaveXxx
+	{
+		WAVEFORMATEX	wf;
+		WAVEHDR			whdr;
+		HWAVEOUT		hWaveOut;
+	//	LPSTR			lpData;
+	}
+	waveXxx;
 }
 tAudioElement;
-
+/*****************************************************************************************************************************/
+DWORD WINAPI PlaySamplesThread(LPVOID t);
+/*****************************************************************************************************************************/
+int PlayingInit(tAudioElement* pThis);
+int PlayingDeinit(tAudioElement* pThis);
+int PlaySamples(tAudioElement* pThis);
 /*****************************************************************************************************************************/
 #endif // __AUDIOSTREAMING_H__

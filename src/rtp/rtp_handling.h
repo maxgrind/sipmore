@@ -1,13 +1,17 @@
 /***************************************************************************************************************************//*
-* @file    sip.h
+* @file    rtp_handling.h
 * @author  Maxim Ivanchenko
-* @brief   Libosib2 sip usage
+* @brief   rtp handling 
 ******************************************************************************************************************************/
 #pragma once
+#include "lib/rtp/rtp.h"
 #include "osip2/osip.h"
+#if defined(_WIN32) // Visual Studio and MinGW
+#include <winsock2.h>
+#include <Windows.h>
+#include <ws2tcpip.h>
+#endif
+#include <stdio.h>
 /*****************************************************************************************************************************/
-void SipProcess(osip_t* osip, char* pBuf, int size, SOCKET sock);
-void ProcessNewReqIst(osip_t* osip, osip_event_t *evt, int sock);
-void ProcessNewReqNist(osip_t* osip, osip_event_t *evt, int sock);
-int BuildResponse(const osip_message_t *request, osip_message_t **response);
+int RtpProcess(osip_t* osip, char* pBuf, int size, SOCKET sock);
 /*****************************************************************************************************************************/

@@ -1,3 +1,11 @@
+/*
+http://www.cisco.com/c/en/us/support/docs/voice/voice-quality/7934-bwidth-consume.html
+Codec Information																							Bandwidth Calculations
+Codec & Bit Rate (Kbps)	Codec Sample Size (Bytes)	Codec Sample Interval (ms)	Mean Opinion Score (MOS)	Voice Payload Size (Bytes)	Voice Payload Size (ms)	Packets Per Second (PPS)	Bandwidth MP or FRF.12 (Kbps)	Bandwidth w/cRTP MP or FRF.12 (Kbps)	Bandwidth Ethernet (Kbps)
+G.711 (64 Kbps)			80 Bytes					10 ms						4.1							160 Bytes					20 ms					50							82.8 Kbps						67.6 Kbps								87.2 Kbps
+*/
+
+
 signed short MuLaw_Decode(char number)
 {
 	const unsigned short MULAW_BIAS = 33;

@@ -1,21 +1,22 @@
 /***************************************************************************************************************************//*
-* @file    sip.c
+* @file    main.c
 * @author  Maxim Ivanchenko
-* @version 1.0
-* @date    September, 2014
-* @brief   Libosib2 usage
+* @brief   main()
 ******************************************************************************************************************************/
 #include <assert.h>
 
 #include "ip_stack/udp_server.h"
 #include "sip/sip.h"
+#include "rtp/rtp_handling.h"
 #include "sip/callbacks.h"
+#include "config.h"
+
+#include "osip2/osip.h" // need to be included after sockets
+
 #include "lib/rtp/rtp.h"
 #include "lib/wav/wav.h"
-#include "osip2/osip.h"
 #include "lib/audiostreaming/audiostreaming.h"
 #include "lib/codec/g711/itu/g711itu.h"
-#include "config.h"
 /*****************************************************************************************************************************/
 int gWavIsWriting = 0;
 tWaveFileParams gWavParams;
@@ -24,6 +25,8 @@ osip_t* gpOsip;
 char gSpdPort[6];
 char gClientIp[13];
 signed short MuLaw_Decode(char number);
+HANDLE WINAPI gPlayThreadHandle;
+HANDLE WINAPI gPalyThreadMutex[2];
 /*****************************************************************************************************************************/
 void MgsParseTest(pMsg)
 {
@@ -69,18 +72,18 @@ extern IN_ADDR gDestIp;
 int main(int argc, char ** argv, char ** env)
 {
 	osip_t *	pOsip			= NULL;
+
 	// UDP socket for SIP
 	char*		pUdpBuf; 
 	SOCKET		sock			= UdpServerCreate(&pUdpBuf, PORT_SIP);
 	SOCKADDR_IN sockIn;
-	// UDP socket for RTP
+
+	// UDP socket for RTP. todo: create dynamically on server invite receive
 	char*		pRtpBuf;
 	SOCKET		sockRtp			= UdpServerCreate(&pRtpBuf, PORT_RTP);
 	SOCKADDR_IN sockInRtp;
-	int			udpRecvdSize	= 0;
 
-	HANDLE WINAPI playThreadHandle;
-	HANDLE WINAPI palyThreadMutex;
+	int			udpRecvdSize	= 0;
 	int			i;
 
 	_itoa_s(PORT_RTP, gSpdPort, 6, 10); // 6 - max quantity of digits in port value; 10 - radix
@@ -117,8 +120,9 @@ int main(int argc, char ** argv, char ** env)
 
 	FileWavCreate(&gWavParams);
 
-	//palyThreadMutex = CreateMutex(NULL, 0, NULL);
-	playThreadHandle =  CreateThread(
+	gPalyThreadMutex[0] = CreateMutex(NULL, 0, NULL);
+	gPalyThreadMutex[1] = CreateMutex(NULL, 0, NULL);
+	gPlayThreadHandle = CreateThread(
 		NULL, // this thread wouldn't be inherited
 		0, // stack size in bytes (0 - defualts stack size of 1 Mb)
 		PlaySamplesThread,
@@ -141,142 +145,7 @@ int main(int argc, char ** argv, char ** env)
 		udpRecvdSize = UdpServerProcess(sockRtp, pRtpBuf, &sockInRtp);
 		if (udpRecvdSize != 0)
 		{
-
-#if 0
-			unsigned char* pBuf = (unsigned char*)malloc(udpRecvdSize + 3);
-			char* pPrinfStart = pBuf;
-			memcpy(pBuf, pRtpBuf, udpRecvdSize);
-
-#if 1 
-			for (i = 0; i < udpRecvdSize; i++)
-			{
-				//printf("0x%02x", pBuf[i]);
-				//printf("%#2x ", pBuf[i]);
-				printf("%02X ", pBuf[i]);
-				//printf("%d ", pBuf[i]);
-			}
-#else
-			for (i = 0; i < udpRecvdSize; i++)
-			{
-				pPrinfStart += sprintf(pPrinfStart, "%02X", pBuf[i]);
-			}
-#endif
-			//printf("%d\r\n", udpRecvdSize);
-			printf("\r\n");
-#endif // 0
-			tRtpPacket rtp;
-			char* pPrinfStart;
-			static int q = 0;
-			signed short* pUncompressed = NULL;
-			int err;
-			pUncompressed = (signed short*) malloc(udpRecvdSize * 2);
-
-			err = RtpParse(pRtpBuf, udpRecvdSize, &rtp);
-			// make sure it is RTP (STUN can be also received here)
-			if (err != 0)
-			{
-				goto out;
-			}
-
-			//pPrinfStart = rtp.pPayload;
-			//printf("%d: ", rtp.header.ts);
-			//for (i = 0; i < 10; i++)
-			//{
-			//	//printf("%02X ", rtp.pPayload[i]);
-			//}
-			//printf("\r\n");
-			//q++;
-
-			//if (q>300)
-			//{
-			//	// stop writing WAV at 300 rtp packets
-			//	FileWavFinish(&gWavParams);
-			//	gWavIsWriting = 0;
-			//	return;
-			//}
-			//else
-			//{
-
-#if 0 // recording WAV
-#if 1 // u-law vs pcm
-
-				
-			signed short* pInShort = (signed short*) malloc(udpRecvdSize * 2);
-
-				if (pUncompressed == NULL)
-				{
-					FileWavFinish(&gWavParams);
-					gWavIsWriting = 0;
-					return -1;
-				}
-				else
-				{
-					//decode
-#if 1 // choose g711 lib
-					for (i = 0; i < rtp.payloadLen; i++)
-					{
-						pInShort[i] = (signed short) rtp.pPayload[i];
-					}
-					ulaw_expand(rtp.payloadLen, pInShort, pUncompressed);
-
-#else
-					for (i = 0; i < rtp.payloadLen; i++)
-					{
-						pUncompressed[i] = MuLaw_Decode(rtp.pPayload[i]);
-					}
-#endif
-					gWavIsWriting = 1;
-					FileWavAppendData(pUncompressed, rtp.payloadLen * 2, &gWavParams);
-				}
-
-#else
-				gWavIsWriting = 1;
-				FileWavAppendData(rtp.pPayload, rtp.payloadLen, &gWavParams);
-
-#endif
-#endif
-			//}
-
-#if 1  // stream playing
-			if (((&gAudioBuf[0])->mutex == 0) && ((&gAudioBuf[0])->handleNeeded != 1))
-			{
-				(&gAudioBuf[0])->mutex = 1;
-				for (i = 0; i < rtp.payloadLen; i++)
-				{
-					(&gAudioBuf[0])->buffer[i] = MuLaw_Decode(rtp.pPayload[i]);
-					
-				}
-				(&gAudioBuf[0])->sizeInBytes = rtp.payloadLen;
-				(&gAudioBuf[0])->handleNeeded = 1;
-				(&gAudioBuf[0])->mutex = 0;
-				goto out;
-			}
-			else if (((&gAudioBuf[1])->mutex == 0) && ((&gAudioBuf[1])->handleNeeded != 1))
-			{
-				(&gAudioBuf[1])->mutex = 1;
-				for (i = 0; i < rtp.payloadLen; i++)
-				{
-					(&gAudioBuf[1])->buffer[i] = MuLaw_Decode(rtp.pPayload[i]);
-				}
-				(&gAudioBuf[1])->sizeInBytes = rtp.payloadLen;
-				(&gAudioBuf[1])->handleNeeded = 1;
-				(&gAudioBuf[1])->mutex = 0;
-				goto out;
-
-			}
-			else
-			{
-				static int miss = 0;
-				miss++;
-				printf("missed %d \r\n", miss);
-			}
-			
-
-
-#endif
-		out:
-			free(pUncompressed);
-			RtpPacketDestroy(&rtp);
+			RtpProcess(pOsip, pRtpBuf, udpRecvdSize, sockRtp);
 		}
 		
 		osip_ict_execute(pOsip);

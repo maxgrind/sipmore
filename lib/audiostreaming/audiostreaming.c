@@ -1,4 +1,4 @@
-/***************************************************************************************************************************//*
+/**************************************************************************************************************************//**
 * @file    audiostreaming.c
 * @author  Maxim Ivanchenko
 * @brief   Audiostreaming for WindowsNT using waveXxx API
@@ -7,6 +7,8 @@
 
 #include "audiostreaming.h"
 #include <windows.h>
+
+#include "lib/rtp/rtp.h" // for recording
 
 /*  MMSYSERR_NOERROR = 0,
 MMSYSERR_ERROR = 1,
@@ -32,13 +34,23 @@ MMSYSERR_NODRIVERCB = 20,
 WAVERR_BADFORMAT = 32,
 WAVERR_STILLPLAYING = 33,
 WAVERR_UNPREPARED = 34 */
-
+/*****************************************************************************************************************************/
 
 // double buffering. todo: replace with a queue
 #define AUDIO_FIFO_LEN	2
-tAudioElement gAudioBuf[AUDIO_FIFO_LEN];
-extern HANDLE WINAPI gPalyThreadMutex[2];
-/***************************************************************************************************************************//*
+tAudioElement			gAudioBuf[AUDIO_FIFO_LEN];
+extern HANDLE WINAPI	gPalyThreadMutex[2];
+/*****************************************************************************************************************************/
+// recording params. todo: make them configurable
+#define SAMPLES_IN_RTP_PACKET	160
+#define RTP_SAMPLE_SIZE_BYTE	8	 // PCMU encoded
+#define RTP_INTERVAL_MS			20
+#define SAMPLE_RATE				8000 // PCMU
+extern char				gRtpSessionActive;
+char					gSamplesBuf[SAMPLES_IN_RTP_PACKET];
+/*****************************************************************************************************************************/
+char MuLaw_Encode(signed short number);
+/**************************************************************************************************************************//**
 * @brief Thread for playing samples received through RTP
 ******************************************************************************************************************************/
 DWORD WINAPI PlaySamplesThread(LPVOID p)
@@ -68,9 +80,9 @@ DWORD WINAPI PlaySamplesThread(LPVOID p)
 	// potential deinit
 	// PlayingDeinit(&gAudioBuf[0]);
 	// PlayingDeinit(&gAudioBuf[1]);
-
+	return 0;
 }
-/***************************************************************************************************************************//*
+/**************************************************************************************************************************//**
 * @brief Init of PlaySamples function
 ******************************************************************************************************************************/
 int PlayingInit(tAudioElement* pThis)
@@ -96,8 +108,8 @@ int PlayingInit(tAudioElement* pThis)
 	mmRes = waveOutOpen(&pThis->waveXxx.hWaveOut, WAVE_MAPPER, &pThis->waveXxx.wf, 0, 0, CALLBACK_NULL); // WAVE_MAPPED_DEFAULT_COMMUNICATION_DEVICE 
 	return mmRes;
 }
-/***************************************************************************************************************************//*
- * @brief Deinit of PlaySamples function
+/**************************************************************************************************************************//**
+ * @brief Deinit of PlaySamples object
 ******************************************************************************************************************************/
 int PlayingDeinit(tAudioElement* pThis)
 {
@@ -105,7 +117,7 @@ int PlayingDeinit(tAudioElement* pThis)
 	mmRes = waveOutClose(pThis->waveXxx.hWaveOut);
 	return mmRes;
 }
-/***************************************************************************************************************************//*
+/**************************************************************************************************************************//**
 * @brief Play samples received through RTP
 ******************************************************************************************************************************/
 int PlaySamples(tAudioElement* pThis)
@@ -131,10 +143,60 @@ int PlaySamples(tAudioElement* pThis)
 
 	return mmRes; // todo
 }
-/***************************************************************************************************************************//*
+/**************************************************************************************************************************//**
+* @brief Thread for recording samples and pass them through RTP
+ todo: create/kill dynamically 
+******************************************************************************************************************************/
+DWORD WINAPI RecSamplesThread(LPVOID p)
+{
+	tAudioElement* pAudEl;
+	int i;
+
+	// At samplerate 8000 kHz we need to accumulate SAMPLES_IN_RTP_PACKET (160) samples
+	// and then send them in the single RTP packet.
+	// So we got 50 RTP packets per second, i.e. send packet evety 20 ms
+
+	RecordingInit(&pAudEl);
+
+	while (1)
+	{
+		if (gRtpSessionActive)
+		{
+			static unsigned char cntr = 0;
+			signed char sample = 0;
+
+			// get a sample from mic
+
+			// encode it
+			gSamplesBuf[cntr] = MuLaw_Encode(sample);
+
+			cntr++;
+			if (cntr >= SAMPLES_IN_RTP_PACKET) // 160 for now
+			{
+				// compose send RTP packet
+				// send it
+
+				cntr = 0;
+			}
+		}
+	}
+	// potential deinit
+	RecordingDeinit(&pAudEl);
+	return 0;
+}
+/**************************************************************************************************************************//**
+* @brief Init of v object
+******************************************************************************************************************************/
+int RecordingInit(tAudioElement* pThis);
+/**************************************************************************************************************************//**
+* @brief Deinit of RecordSamples object
+******************************************************************************************************************************/
+int RecordingDeinit(tAudioElement* pThis);
+/**************************************************************************************************************************//**
 * @brief 
 ******************************************************************************************************************************/
-unsigned int CbRecordSamples(signed short* buffer);
+int RecordSamples(tAudioElement* pThis)
+{
+}
 /*****************************************************************************************************************************/
-
 #endif //_WIN32

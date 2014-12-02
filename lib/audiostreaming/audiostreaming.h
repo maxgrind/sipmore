@@ -1,4 +1,4 @@
-﻿/***************************************************************************************************************************//*
+﻿/**************************************************************************************************************************//**
  * @file    audiostreaming.h
  * @author  Maxim Ivanchenko
  * @brief   Audiostreaming for WindowsNT using waveXxx API
@@ -34,7 +34,7 @@ typedef struct sAudioElement
 	//HANDLE WINAPI winapiMutex;
 	char mutex;
 	char handleNeeded;
-	signed short buffer[AUDIO_ELEMENT_BUFFER_LEN];
+	signed short buffer[AUDIO_ELEMENT_BUFFER_LEN]; // maybe pointer and malloc?
 	int sizeInBytes;
 
 	//waveXxx types
@@ -43,16 +43,19 @@ typedef struct sAudioElement
 		WAVEFORMATEX	wf;
 		WAVEHDR			whdr;
 		HWAVEOUT		hWaveOut;
-	//	LPSTR			lpData;
 	}
 	waveXxx;
 }
 tAudioElement;
 /*****************************************************************************************************************************/
 DWORD WINAPI PlaySamplesThread(LPVOID t);
+DWORD WINAPI RecSamplesThread(LPVOID p);
 /*****************************************************************************************************************************/
 int PlayingInit(tAudioElement* pThis);
 int PlayingDeinit(tAudioElement* pThis);
 int PlaySamples(tAudioElement* pThis);
+int RecordingInit(tAudioElement* pThis);
+int RecordingDeinit(tAudioElement* pThis);
+int RecordSamples(tAudioElement* pThis);
 /*****************************************************************************************************************************/
 #endif // __AUDIOSTREAMING_H__

@@ -1,4 +1,4 @@
-/***************************************************************************************************************************//*
+/**************************************************************************************************************************//**
 * @file    rtp_handling.c
 * @author  Maxim Ivanchenko
 * @brief   rtp handling 
@@ -13,9 +13,10 @@
 
 #include <windows.h>
 /*****************************************************************************************************************************/
-extern tAudioElement gAudioBuf[];
-extern osip_t* gpOsip;
-extern HANDLE WINAPI gPalyThreadMutex[2];
+extern tAudioElement	gAudioBuf[];
+extern osip_t*			gpOsip;
+extern HANDLE WINAPI	gPalyThreadMutex[2];
+extern char				gRtpSessionActive;
 /*****************************************************************************************************************************/
 int RtpProcess(osip_t* osip, char* pRtpBuf, int udpRecvdSize, SOCKET sock)
 {
@@ -37,6 +38,7 @@ int RtpProcess(osip_t* osip, char* pRtpBuf, int udpRecvdSize, SOCKET sock)
 		printf("notRtp %d \r\n", notRtp);
 		return -1;
 	}
+	gRtpSessionActive = 1;
 
 	//pPrinfStart = rtp.pPayload;
 	//printf("%d: ", rtp.header.ts);

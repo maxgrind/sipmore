@@ -1,4 +1,4 @@
-/***************************************************************************************************************************//*
+/**************************************************************************************************************************//**
  * @file    callbacks.c
  * @author  Maxim Ivanchenko
  * @brief   RFC3550 RTP protocol implementation  
@@ -12,12 +12,12 @@
 #include "osipparser2/sdp_message.h"
 #include "config.h"
 /******************************************************************************************************************************/
-IN_ADDR gDestIp;
-extern char gSpdPort[6];
-// extern char gClientIp[13];
-extern tWaveFileParams gWavParams;
-extern int gWavIsWriting;
-extern osip_t* gpOsip;
+IN_ADDR					gDestIp;
+extern char				gSpdPort[6];
+extern tWaveFileParams	gWavParams;
+extern int				gWavIsWriting;
+extern osip_t*			gpOsip;
+extern char				gRtpSessionActive;
 /******************************************************************************************************************************/
 int CbUdpSendMessage(osip_transaction_t * pTransaction, osip_message_t * pMessage, char * pChar, int port, int out_socket)
 {
@@ -251,6 +251,8 @@ int CbOnNistByeRcvd(int type, osip_transaction_t * pTranaction, osip_message_t *
 {
 	osip_message_t *response = NULL;
 	osip_event_t *evt = NULL;
+
+	gRtpSessionActive = 0;
 
 	BuildResponse(pMsg, &response);//ok
 	osip_message_set_status_code(response, SIP_OK);

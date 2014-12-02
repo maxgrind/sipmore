@@ -24,7 +24,9 @@ tAudioElement	gAudioBuf[];
 osip_t*			gpOsip;
 char			gSpdPort[6];
 char			gClientIp[13];
+char			gRtpSessionActive;
 HANDLE WINAPI	gPlayThreadHandle;
+HANDLE WINAPI	gRecThreadHandle;
 HANDLE WINAPI	gPalyThreadMutex[2];
 /*****************************************************************************************************************************/
 extern IN_ADDR gDestIp;
@@ -58,13 +60,11 @@ int main(int argc, char ** argv, char ** env)
 	{
 		return -1;
 	}
+
 	SetCallbacks(pOsip);
 	gWavParams.pFileName = "d:\\sipmore.wav";
 
-	gAudioBuf[0].mutex = 0;
-	gAudioBuf[0].handleNeeded = 0;
-	gAudioBuf[1].mutex = 0;
-	gAudioBuf[1].handleNeeded = 0;
+
 
 #if 0
 	gWavParams.sampleFormat.compressionCode = WAV_FMT_COMP_CODE_G711_ULAW;
@@ -84,8 +84,15 @@ int main(int argc, char ** argv, char ** env)
 
 	FileWavCreate(&gWavParams);
 
-	gPalyThreadMutex[0] = CreateMutex(NULL, 0, NULL);
-	gPalyThreadMutex[1] = CreateMutex(NULL, 0, NULL);
+	gAudioBuf[0].mutex			= 0;
+	gAudioBuf[0].handleNeeded	= 0;
+	gAudioBuf[1].mutex			= 0;
+	gAudioBuf[1].handleNeeded	= 0;
+	gRtpSessionActive			= 0;
+	//gPalyThreadMutex[0] = CreateMutex(NULL, 0, NULL);
+	//gPalyThreadMutex[1] = CreateMutex(NULL, 0, NULL);
+
+	// playback thread
 	gPlayThreadHandle = CreateThread(
 		NULL, // this thread wouldn't be inherited
 		0, // stack size in bytes (0 - defualts stack size of 1 Mb)
@@ -94,7 +101,18 @@ int main(int argc, char ** argv, char ** env)
 		0,
 		0
 		);
-	
+
+	// record thread
+	gRecThreadHandle = CreateThread(
+		NULL, // this thread wouldn't be inherited
+		0, // stack size in bytes (0 - defualts stack size of 1 Mb)
+		RecSamplesThread,
+		NULL,
+		0,
+		0
+		);
+
+//***************************** MAIN CYCLE ************************************//
 	while (1)
 	{
 		// SIP
@@ -111,6 +129,7 @@ int main(int argc, char ** argv, char ** env)
 			RtpProcess(pOsip, pRtpBuf, udpRecvdSize, sockRtp);
 		}
 		
+		// osip core
 		osip_ict_execute(pOsip);
 		osip_ist_execute(pOsip);
 		osip_nict_execute(pOsip);

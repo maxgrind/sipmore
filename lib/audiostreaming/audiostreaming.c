@@ -13,6 +13,7 @@
 // common
 #include "audiostreaming.h"
 #include <windows.h>
+#include "config.h"
 
 /*  
 MMSYSERR_NOERROR = 0,
@@ -72,17 +73,20 @@ DWORD WINAPI PlaySamplesThread(LPVOID p)
 	PlayingInit(&gAudioBuf[1]);
 	while (1)
 	{
-		for (i = 0; i < AUDIO_FIFO_LEN; i++)
+		if (gRtpSessionActive)
 		{
-			pAudEl = &gAudioBuf[i];
-			//if (gPalyThreadMutex[0] )
-			if ((pAudEl->mutex == 0) && (pAudEl->handleNeeded != 0))
+			for (i = 0; i < AUDIO_FIFO_LEN; i++)
 			{
-				//pAudEl->winapiMutex;
-				pAudEl->mutex = 1;
-				PlaySamples(pAudEl);
-				pAudEl->handleNeeded = 0;
-				pAudEl->mutex = 0;
+				pAudEl = &gAudioBuf[i];
+				//if (gPalyThreadMutex[0] )
+				if ((pAudEl->mutex == 0) && (pAudEl->handleNeeded != 0))
+				{
+					//pAudEl->winapiMutex;
+					pAudEl->mutex = 1;
+					PlaySamples(pAudEl);
+					pAudEl->handleNeeded = 0;
+					pAudEl->mutex = 0;
+				}
 			}
 		}
 	}
@@ -197,7 +201,7 @@ DWORD WINAPI RecSamplesThread(LPVOID p)
 			port = atoi(gSpdPort);
 			if ((gDestIp.S_un.S_addr != 0) && (port != 0))
 			{
-				UdpSend(pRtpFrame, rtpFrameLen, gDestIp, gSpdPort);
+				UdpSend(pRtpFrame, rtpFrameLen, gDestIp, port);
 			}
 
 			// modify iterators
@@ -228,13 +232,19 @@ int RecordingInit(tAudioElement* pThis)
 	// fill up the wave header
 	pThis->waveXxx.whdr.lpData = (LPSTR) gSamplesBufRaw;
 	pThis->waveXxx.whdr.dwBufferLength = (DWORD) sizeof(gSamplesBufRaw); // 160 16-bit samples
-	//pThis->waveXxx.whdr.dwFlags = WHDR_BEGINLOOP;
+	pThis->waveXxx.whdr.dwFlags = WHDR_BEGINLOOP;
 	//pThis->waveXxx.whdr.dwFlags = WHDR_BEGINLOOP | WHDR_ENDLOOP | WHDR_PREPARED;
+	pThis->waveXxx.whdr.dwBytesRecorded = 0;
 	pThis->waveXxx.whdr.dwFlags = 0;
 	pThis->waveXxx.whdr.dwLoops = 0;
 	pThis->waveXxx.whdr.dwUser	= 0;
 
-	mmRes = waveOutOpen(&pThis->waveXxx.hWaveIn, WAVE_MAPPER, &pThis->waveXxx.wf, 0, 0, WAVE_FORMAT_DIRECT); // WAVE_MAPPED_DEFAULT_COMMUNICATION_DEVICE  CALLBACK_NULL  WAVE_FORMAT_DIRECT
+	mmRes = waveInOpen(&pThis->waveXxx.hWaveIn, WAVE_MAPPER, &pThis->waveXxx.wf, 0, 0, WAVE_FORMAT_DIRECT); // WAVE_MAPPED_DEFAULT_COMMUNICATION_DEVICE  CALLBACK_NULL  WAVE_FORMAT_DIRECT
+	if (mmRes != MMSYSERR_NOERROR)
+	{
+		mmRes = mmRes; // bp
+	}
+
 	return mmRes;
 }
 /**************************************************************************************************************************//**
@@ -254,21 +264,30 @@ int RecordSamples(tAudioElement* pThis)
 	MMRESULT mmRes;
 	struct sWaveXxx* p = &pThis->waveXxx;
 
+	mmRes = waveInPrepareHeader(p->hWaveIn, &p->whdr, sizeof(p->whdr));
+	if (mmRes != MMSYSERR_NOERROR)
+	{
+		mmRes; // bp
+	}
+
 	// Insert a wave input buffer
 	mmRes = waveInAddBuffer(p->hWaveIn, &p->whdr, sizeof(WAVEHDR));
 	if (mmRes != MMSYSERR_NOERROR)
 	{
-		mmRes = mmRes; // bp
+		mmRes; // bp
 	}
 
 	// Commence sampling input
 	mmRes = waveInStart(p->hWaveIn);
 	if (mmRes != MMSYSERR_NOERROR)
 	{
-		mmRes = mmRes; // bp
+		mmRes; // bp
 	}
 	// Wait until finished recording
-	while (waveInUnprepareHeader(p->hWaveIn, &p->whdr, sizeof(WAVEHDR)) == WAVERR_STILLPLAYING);
+	while (!(p->whdr.dwFlags & WHDR_DONE));
+	waveInUnprepareHeader(p->hWaveIn, &p->whdr, sizeof(WAVEHDR));
+	//while (waveInUnprepareHeader(p->hWaveIn, &p->whdr, sizeof(WAVEHDR)));
+	mmRes;
 }
 /*****************************************************************************************************************************/
 #endif //_WIN32

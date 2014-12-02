@@ -36,10 +36,10 @@ int RtpCompose
 (
 	unsigned short sequenceNumber,
 	unsigned int timestamp,
-	char *pData,
-	int length, // in bytes
+	char *pPayload,
+	int payloadlength, // in bytes
 	char **ppRtpPacked, // out packet
-	int *pLength  // out packet length in bytes
+	int *pLength  // out packet's payload length in bytes
 );
 /*****************************************************************************************************************************/
 #endif // __RTP_H__

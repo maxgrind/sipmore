@@ -41,14 +41,14 @@ int RtpCompose
 (
 	unsigned short sequenceNumber,
 	unsigned int timestamp,
-	char *pData,
-	int length, // in bytes
+	char *pPayload,
+	int payloadlength, // payload length in bytes
 	char **ppRtpPacked, // out packet
 	int *pLength  // out packet length in bytes
 )
 {
 	int i = 0;
-	*ppRtpPacked = (char*) malloc(length + 12);
+	*ppRtpPacked = (char*) malloc(payloadlength + 12);
 	char *pPacket = *ppRtpPacked;
 	if (*ppRtpPacked == NULL) return -1;
 
@@ -65,9 +65,9 @@ int RtpCompose
 	pPacket[10] = (char)0x34;
 	pPacket[11] = (char)0xfb;
 
-	memcpy(&pPacket[12], pData, length);
+	memcpy(&pPacket[12], pPayload, payloadlength);
 
-	*pLength = length + 12;
+	*pLength = payloadlength + 12;
 
 	return 0;
 }

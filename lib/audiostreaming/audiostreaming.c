@@ -5,12 +5,17 @@
 ******************************************************************************************************************************/
 #ifdef _WIN32
 
+// for recording
+#include "ip_stack/udp_server.h"
+#include "lib/rtp/rtp.h"
+#include "lib/codec/g711/itu/g711itu.h" 
+
+// common
 #include "audiostreaming.h"
 #include <windows.h>
 
-#include "lib/rtp/rtp.h" // for recording
-
-/*  MMSYSERR_NOERROR = 0,
+/*  
+MMSYSERR_NOERROR = 0,
 MMSYSERR_ERROR = 1,
 MMSYSERR_BADDEVICEID = 2,
 MMSYSERR_NOTENABLED = 3,
@@ -40,6 +45,8 @@ WAVERR_UNPREPARED = 34 */
 #define AUDIO_FIFO_LEN	2
 tAudioElement			gAudioBuf[AUDIO_FIFO_LEN];
 extern HANDLE WINAPI	gPalyThreadMutex[2];
+extern IN_ADDR			gDestIp;
+extern char				gSpdPort[6];
 /*****************************************************************************************************************************/
 // recording params. todo: make them configurable
 #define SAMPLES_IN_RTP_PACKET	160
@@ -47,7 +54,9 @@ extern HANDLE WINAPI	gPalyThreadMutex[2];
 #define RTP_INTERVAL_MS			20
 #define SAMPLE_RATE				8000 // PCMU
 extern char				gRtpSessionActive;
-char					gSamplesBuf[SAMPLES_IN_RTP_PACKET];
+signed short			gSamplesBufEncoded16bit[SAMPLES_IN_RTP_PACKET];
+signed char				gSamplesBufEncoded8bit[SAMPLES_IN_RTP_PACKET];
+signed short			gSamplesBufRaw[SAMPLES_IN_RTP_PACKET];
 /*****************************************************************************************************************************/
 char MuLaw_Encode(signed short number);
 /**************************************************************************************************************************//**
@@ -149,54 +158,117 @@ int PlaySamples(tAudioElement* pThis)
 ******************************************************************************************************************************/
 DWORD WINAPI RecSamplesThread(LPVOID p)
 {
-	tAudioElement* pAudEl;
-	int i;
+	tAudioElement	audEl;
+	tRtpPacket		rtp;			// unpacket rtp packet
+	char*			pRtpFrame;		// packet rtp packet
+	int				rtpFrameLen;	
+	int				timestamp	= 0;
+	int				port		= 0;
+	float			ms			= 0;
+	int				i			= 0;
+	unsigned short	cntr		= 0;
 
 	// At samplerate 8000 kHz we need to accumulate SAMPLES_IN_RTP_PACKET (160) samples
 	// and then send them in the single RTP packet.
 	// So we got 50 RTP packets per second, i.e. send packet evety 20 ms
 
-	RecordingInit(&pAudEl);
+	RecordingInit(&audEl);
 
 	while (1)
 	{
 		if (gRtpSessionActive)
 		{
-			static unsigned char cntr = 0;
-			signed char sample = 0;
+			// get a samples from mic
+			RecordSamples(&audEl); // blocking until get 160 samples. 20 ms passed
 
-			// get a sample from mic
-
-			// encode it
-			gSamplesBuf[cntr] = MuLaw_Encode(sample);
-
-			cntr++;
-			if (cntr >= SAMPLES_IN_RTP_PACKET) // 160 for now
+			// encode them
+			ulaw_compress(SAMPLES_IN_RTP_PACKET, gSamplesBufRaw, gSamplesBufEncoded16bit);
+			for (i = 0; i < SAMPLES_IN_RTP_PACKET; i++)
 			{
-				// compose send RTP packet
-				// send it
-
-				cntr = 0;
+				gSamplesBufEncoded8bit[i] = gSamplesBufEncoded16bit[i]; // becuase of encoder operates shorts
 			}
+
+			timestamp = (unsigned int) ms * SAMPLE_RATE;			
+
+			// compose RTP packet
+			RtpCompose(cntr, timestamp, gSamplesBufEncoded8bit, SAMPLES_IN_RTP_PACKET, &pRtpFrame, &rtpFrameLen);
+
+			// send it
+			port = atoi(gSpdPort);
+			if ((gDestIp.S_un.S_addr != 0) && (port != 0))
+			{
+				UdpSend(pRtpFrame, rtpFrameLen, gDestIp, gSpdPort);
+			}
+
+			// modify iterators
+			ms += 0.02;
+			cntr++;
 		}
 	}
 	// potential deinit
-	RecordingDeinit(&pAudEl);
+	RecordingDeinit(&audEl);
 	return 0;
 }
 /**************************************************************************************************************************//**
-* @brief Init of v object
+* @brief Init of RecordSamples function
 ******************************************************************************************************************************/
-int RecordingInit(tAudioElement* pThis);
+int RecordingInit(tAudioElement* pThis)
+{
+	MMRESULT mmRes;
+	// fill up the wave format
+	pThis->waveXxx.wf.wFormatTag = WAVE_FORMAT_PCM;
+	pThis->waveXxx.wf.nChannels = 1;
+	pThis->waveXxx.wf.nSamplesPerSec = 8000;
+	pThis->waveXxx.wf.wBitsPerSample = 16;
+	pThis->waveXxx.wf.nBlockAlign = pThis->waveXxx.wf.nChannels * (pThis->waveXxx.wf.wBitsPerSample / 8);
+	pThis->waveXxx.wf.nAvgBytesPerSec = pThis->waveXxx.wf.nSamplesPerSec * pThis->waveXxx.wf.nBlockAlign;
+	//pThis->waveXxx.wf.nAvgBytesPerSec = pThis->waveXxx.wf.nSamplesPerSec * pThis->waveXxx.wf.wBitsPerSample / 8 * pThis->waveXxx.wf.nChannels; //8000 * 2;//
+	pThis->waveXxx.wf.cbSize = 0;
+
+	// fill up the wave header
+	pThis->waveXxx.whdr.lpData = (LPSTR) gSamplesBufRaw;
+	pThis->waveXxx.whdr.dwBufferLength = (DWORD) sizeof(gSamplesBufRaw); // 160 16-bit samples
+	//pThis->waveXxx.whdr.dwFlags = WHDR_BEGINLOOP;
+	//pThis->waveXxx.whdr.dwFlags = WHDR_BEGINLOOP | WHDR_ENDLOOP | WHDR_PREPARED;
+	pThis->waveXxx.whdr.dwFlags = 0;
+	pThis->waveXxx.whdr.dwLoops = 0;
+	pThis->waveXxx.whdr.dwUser	= 0;
+
+	mmRes = waveOutOpen(&pThis->waveXxx.hWaveIn, WAVE_MAPPER, &pThis->waveXxx.wf, 0, 0, WAVE_FORMAT_DIRECT); // WAVE_MAPPED_DEFAULT_COMMUNICATION_DEVICE  CALLBACK_NULL  WAVE_FORMAT_DIRECT
+	return mmRes;
+}
 /**************************************************************************************************************************//**
 * @brief Deinit of RecordSamples object
 ******************************************************************************************************************************/
-int RecordingDeinit(tAudioElement* pThis);
+int RecordingDeinit(tAudioElement* pThis)
+{
+	MMRESULT mmRes;
+	mmRes = waveOutClose(pThis->waveXxx.hWaveIn);
+	return mmRes;
+}
 /**************************************************************************************************************************//**
 * @brief 
 ******************************************************************************************************************************/
 int RecordSamples(tAudioElement* pThis)
 {
+	MMRESULT mmRes;
+	struct sWaveXxx* p = &pThis->waveXxx;
+
+	// Insert a wave input buffer
+	mmRes = waveInAddBuffer(p->hWaveIn, &p->whdr, sizeof(WAVEHDR));
+	if (mmRes != MMSYSERR_NOERROR)
+	{
+		mmRes = mmRes; // bp
+	}
+
+	// Commence sampling input
+	mmRes = waveInStart(p->hWaveIn);
+	if (mmRes != MMSYSERR_NOERROR)
+	{
+		mmRes = mmRes; // bp
+	}
+	// Wait until finished recording
+	while (waveInUnprepareHeader(p->hWaveIn, &p->whdr, sizeof(WAVEHDR)) == WAVERR_STILLPLAYING);
 }
 /*****************************************************************************************************************************/
 #endif //_WIN32

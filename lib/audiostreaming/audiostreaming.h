@@ -43,6 +43,7 @@ typedef struct sAudioElement
 		WAVEFORMATEX	wf;
 		WAVEHDR			whdr;
 		HWAVEOUT		hWaveOut;
+		HWAVEIN			hWaveIn;
 	}
 	waveXxx;
 }

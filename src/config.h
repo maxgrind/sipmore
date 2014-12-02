@@ -23,8 +23,8 @@
 #ifdef M_HOME_PC
 #define SERV_IP_ADDR "192.168.1.5"
 #else
-#define SERV_IP_ADDR "192.168.1.50"
-//#define SERV_IP_ADDR "192.168.43.13"
+//#define SERV_IP_ADDR "192.168.1.50"
+#define SERV_IP_ADDR "192.168.43.13"
 #endif
 /*****************************************************************************************************************************/
 #define UA_NAME			"sipmore/0.1"

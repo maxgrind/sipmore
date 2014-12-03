@@ -5,6 +5,8 @@
 ******************************************************************************************************************************/
 #ifdef _WIN32
 
+#include "ip_stack/udp_server.h"
+
 // for recording
 #include "ip_stack/udp_server.h"
 #include "lib/rtp/rtp.h"
@@ -14,6 +16,9 @@
 #include "audiostreaming.h"
 #include <windows.h>
 #include "config.h"
+#include "lib/queue/simple_queue.h"
+#include "osip2/osip.h" // need to be included after sockets
+#include "rtp/rtp_handling.h"
 
 /*  
 MMRESULT:
@@ -48,6 +53,10 @@ tAudioElement			gAudioBuf[AUDIO_FIFO_LEN];
 extern HANDLE WINAPI	gPalyThreadMutex[2];
 extern IN_ADDR			gDestIp;
 extern char				gSpdPort[6];
+
+extern tQueueEntity	gAudioInQueue; // this is replacement!
+extern osip_t*			gpOsip;
+
 /*****************************************************************************************************************************/
 // recording params. todo: make them configurable
 #define SAMPLES_IN_RTP_PACKET	160
@@ -66,16 +75,30 @@ char MuLaw_Encode(signed short number);
 ******************************************************************************************************************************/
 DWORD WINAPI PlaySamplesThread(LPVOID p)
 {
-
+#if 1
 	tAudioElement* pAudEl;
 	int i;
 
+	char*		pRtpBuf;
+	SOCKET		sockRtp = UdpServerCreate(&pRtpBuf, PORT_RTP);
+	SOCKADDR_IN sockInRtp;
+	int			udpRecvdSize = 0;
+
+	gRtpSock = sockRtp;
 	PlayingInit(&gAudioBuf[0]);
 	PlayingInit(&gAudioBuf[1]);
+
 	while (1)
 	{
-		if (gRtpSessionActive)
+		// RTP 
+		udpRecvdSize = UdpServerProcess(sockRtp, pRtpBuf, &sockInRtp);
+		if (udpRecvdSize != 0)
 		{
+			RtpProcess(gpOsip, pRtpBuf, udpRecvdSize, sockRtp);
+		}
+
+		//if (gRtpSessionActive)
+		//{
 			for (i = 0; i < AUDIO_FIFO_LEN; i++)
 			{
 				pAudEl = &gAudioBuf[i];
@@ -89,12 +112,38 @@ DWORD WINAPI PlaySamplesThread(LPVOID p)
 					pAudEl->mutex = 0;
 				}
 			}
-		}
+		//}
 	}
 	// potential deinit
 	// PlayingDeinit(&gAudioBuf[0]);
 	// PlayingDeinit(&gAudioBuf[1]);
 	return 0;
+#else
+	tAudioElement el;
+	int res;
+	
+	while (1)
+	{
+		if (gRtpSessionActive)
+		{
+			res = QueueGet(&gAudioInQueue, &el);
+			if (res == 0)
+			{
+				if ((el.mutex == 0) && (el.handleNeeded != 0))
+				{
+					PlayingInit(&el);
+					//pAudEl->winapiMutex;
+					el.mutex = 1;
+					PlaySamples(&el);
+					el.handleNeeded = 0;
+					el.mutex = 0;
+				}
+			}
+
+			
+		}
+	}
+#endif
 }
 /**************************************************************************************************************************//**
 * @brief Init of PlaySamples function

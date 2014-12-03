@@ -56,10 +56,10 @@ int RtpCompose
 	pPacket[1] = 0x00;  // no marker, payload type - PCMU. todo: other payloads
 	pPacket[2] = (char)(sequenceNumber >> 8) & 0x00FF;
 	pPacket[3] = (char)sequenceNumber & 0x00FF;
-	pPacket[4] = (char)(sequenceNumber >> 24) & 0x000000FF;
-	pPacket[5] = (char)(sequenceNumber >> 16) & 0x000000FF;
-	pPacket[6] = (char)(sequenceNumber >> 8) & 0x000000FF;
-	pPacket[7] = (char)sequenceNumber & 0x000000FF;
+	pPacket[4] = (char) (timestamp >> 24) & 0x000000FF;
+	pPacket[5] = (char) (timestamp >> 16) & 0x000000FF;
+	pPacket[6] = (char) (timestamp >> 8) & 0x000000FF;
+	pPacket[7] = (char) timestamp & 0x000000FF;
 	pPacket[8] = (char)0x01; // SSRC (sync source). Random
 	pPacket[9] = (char)0xa3;
 	pPacket[10] = (char)0x34;

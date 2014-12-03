@@ -16,6 +16,7 @@
 #include "config.h"
 
 /*  
+MMRESULT:
 MMSYSERR_NOERROR = 0,
 MMSYSERR_ERROR = 1,
 MMSYSERR_BADDEVICEID = 2,
@@ -41,7 +42,6 @@ WAVERR_BADFORMAT = 32,
 WAVERR_STILLPLAYING = 33,
 WAVERR_UNPREPARED = 34 */
 /*****************************************************************************************************************************/
-
 // double buffering. todo: replace with a queue
 #define AUDIO_FIFO_LEN	2
 tAudioElement			gAudioBuf[AUDIO_FIFO_LEN];
@@ -54,6 +54,7 @@ extern char				gSpdPort[6];
 #define RTP_SAMPLE_SIZE_BYTE	8	 // PCMU encoded
 #define RTP_INTERVAL_MS			20
 #define SAMPLE_RATE				8000 // PCMU
+extern SOCKET			gRtpSock;
 extern char				gRtpSessionActive;
 signed short			gSamplesBufEncoded16bit[SAMPLES_IN_RTP_PACKET];
 signed char				gSamplesBufEncoded8bit[SAMPLES_IN_RTP_PACKET];
@@ -166,12 +167,12 @@ DWORD WINAPI RecSamplesThread(LPVOID p)
 	tRtpPacket		rtp;			// unpacket rtp packet
 	char*			pRtpFrame;		// packet rtp packet
 	int				rtpFrameLen;	
-	int				timestamp	= 0;
-	int				port		= 0;
-	float			ms			= 0;
-	int				i			= 0;
 	unsigned short	cntr		= 0;
-
+	unsigned int	timestamp	= 0;
+	int				port		= 0;
+	//float			seconds		= 0;
+	int				i			= 0;
+	
 	// At samplerate 8000 kHz we need to accumulate SAMPLES_IN_RTP_PACKET (160) samples
 	// and then send them in the single RTP packet.
 	// So we got 50 RTP packets per second, i.e. send packet evety 20 ms
@@ -192,7 +193,8 @@ DWORD WINAPI RecSamplesThread(LPVOID p)
 				gSamplesBufEncoded8bit[i] = gSamplesBufEncoded16bit[i]; // becuase of encoder operates shorts
 			}
 
-			timestamp = (unsigned int) ms * SAMPLE_RATE;			
+			//timestamp = (unsigned int) seconds * SAMPLE_RATE;
+			timestamp += SAMPLES_IN_RTP_PACKET;
 
 			// compose RTP packet
 			RtpCompose(cntr, timestamp, gSamplesBufEncoded8bit, SAMPLES_IN_RTP_PACKET, &pRtpFrame, &rtpFrameLen);
@@ -201,11 +203,12 @@ DWORD WINAPI RecSamplesThread(LPVOID p)
 			port = atoi(gSpdPort);
 			if ((gDestIp.S_un.S_addr != 0) && (port != 0))
 			{
-				UdpSend(pRtpFrame, rtpFrameLen, gDestIp, port);
+				//UdpSend(pRtpFrame, rtpFrameLen, gDestIp, port);
+				UdpSendExistSock(gRtpSock, pRtpFrame, rtpFrameLen, gDestIp, port);
 			}
 
 			// modify iterators
-			ms += 0.02;
+			//seconds += 0.02;
 			cntr++;
 		}
 	}

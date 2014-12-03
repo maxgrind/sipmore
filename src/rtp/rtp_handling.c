@@ -17,7 +17,9 @@ extern tAudioElement	gAudioBuf[];
 extern osip_t*			gpOsip;
 extern HANDLE WINAPI	gPalyThreadMutex[2];
 extern char				gRtpSessionActive;
-/*****************************************************************************************************************************/
+/**************************************************************************************************************************//**
+* @brief Filling buffers with input RTP data for PlaySamplesThread (the output data is comletely handled by RecSamplesThread thread)
+******************************************************************************************************************************/
 int RtpProcess(osip_t* osip, char* pRtpBuf, int udpRecvdSize, SOCKET sock)
 {
 	tRtpPacket		rtp;

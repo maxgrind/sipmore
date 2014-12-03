@@ -22,6 +22,7 @@ int				gWavIsWriting = 0;
 tWaveFileParams gWavParams;
 tAudioElement	gAudioBuf[];
 osip_t*			gpOsip;
+SOCKET			gRtpSock;
 char			gSpdPort[6];
 char			gClientIp[13];
 char			gRtpSessionActive;
@@ -53,7 +54,7 @@ int main(int argc, char ** argv, char ** env)
 	int			i;
 
 	_itoa_s(PORT_RTP, gSpdPort, 6, 10); // 6 - max quantity of digits in port value; 10 - radix
-
+	gRtpSock = sockRtp;
 	i = osip_init(&pOsip);
 	gpOsip = pOsip;
 	if (i != 0)

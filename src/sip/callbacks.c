@@ -265,11 +265,26 @@ int CbOnNistByeRcvd(int type, osip_transaction_t * pTranaction, osip_message_t *
 		FileWavFinish(&gWavParams);
 		gWavIsWriting = 0;
 	}
-
 	return 0;
 }
 int CbOnNistCancelRcvd(int type, osip_transaction_t * pTranaction, osip_message_t * pMsg)
 {
+	osip_message_t *response = NULL;
+	osip_event_t *evt = NULL;
+
+	//gRtpSessionActive = 0;
+
+	BuildResponse(pMsg, &response);//ok
+	osip_message_set_status_code(response, SIP_OK);
+	evt = osip_new_outgoing_sipmessage(response);
+	osip_message_set_reason_phrase(response, osip_strdup("Ok"));
+	osip_transaction_add_event(pTranaction, evt);
+
+	if (gWavIsWriting == 1)
+	{
+		FileWavFinish(&gWavParams);
+		gWavIsWriting = 0;
+	}
 	return 0;
 }
 int CbOnNistInfoRcvd(int type, osip_transaction_t * pTranaction, osip_message_t * pMsg)

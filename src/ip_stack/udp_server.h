@@ -91,6 +91,7 @@ SOCKET UdpServerCreate(char** ppBuf, unsigned short port);
 void UdpServerDelete(SOCKET* pSocket);
 int UdpServerProcess(SOCKET socket, char* pBuf, SOCKADDR_IN* pSockIn);
 int UdpSend(char* pBuf, int len, IN_ADDR destIp, unsigned short port);
+int UdpSendExistSock(SOCKET sock, char* pBuf, int len, IN_ADDR destIp, unsigned short port);
 
 
 #endif // __UDP_SERVER_H__

@@ -50,101 +50,56 @@ WAVERR_UNPREPARED = 34 */
 // double buffering. todo: replace with a queue
 #define AUDIO_FIFO_LEN	2
 tAudioElement			gAudioBuf[AUDIO_FIFO_LEN];
-extern HANDLE WINAPI	gPalyThreadMutex[2];
 extern IN_ADDR			gDestIp;
 extern char				gSpdPort[6];
 
-extern tQueueEntity	gAudioInQueue; // this is replacement!
 extern osip_t*			gpOsip;
-
-/*****************************************************************************************************************************/
-// recording params. todo: make them configurable
-#define SAMPLES_IN_RTP_PACKET	160
-#define RTP_SAMPLE_SIZE_BYTE	8	 // PCMU encoded
-#define RTP_INTERVAL_MS			20
-#define SAMPLE_RATE				8000 // PCMU
-extern SOCKET			gRtpSock;
 extern char				gRtpSessionActive;
-signed short			gSamplesBufEncoded16bit[SAMPLES_IN_RTP_PACKET];
-signed char				gSamplesBufEncoded8bit[SAMPLES_IN_RTP_PACKET];
+extern SOCKET			gRtpSock;
+
+signed short			gSamplesBufEncoded16bit[SAMPLES_IN_RTP_PACKET]; // becuase of encoder operates shorts
+signed char				gSamplesBufEncoded8bit[SAMPLES_IN_RTP_PACKET]; // becuase of encoder operates shorts
 signed short			gSamplesBufRaw[SAMPLES_IN_RTP_PACKET];
 /*****************************************************************************************************************************/
 char MuLaw_Encode(signed short number);
 /**************************************************************************************************************************//**
 * @brief Thread for playing samples received through RTP
 ******************************************************************************************************************************/
+#if !defined PLAY_IN_RTP_RCV_THREAD 
 DWORD WINAPI PlaySamplesThread(LPVOID p)
 {
-#if 1
 	tAudioElement* pAudEl;
 	int i;
 
-	char*		pRtpBuf;
-	SOCKET		sockRtp = UdpServerCreate(&pRtpBuf, PORT_RTP);
-	SOCKADDR_IN sockInRtp;
-	int			udpRecvdSize = 0;
+	gAudioBuf[0].mutex			= 0;
+	gAudioBuf[0].handleNeeded	= 0;
+	gAudioBuf[1].mutex			= 0;
+	gAudioBuf[1].handleNeeded	= 0;
 
-	gRtpSock = sockRtp;
 	PlayingInit(&gAudioBuf[0]);
 	PlayingInit(&gAudioBuf[1]);
 
 	while (1)
 	{
-		// RTP 
-		udpRecvdSize = UdpServerProcess(sockRtp, pRtpBuf, &sockInRtp);
-		if (udpRecvdSize != 0)
-		{
-			RtpProcess(gpOsip, pRtpBuf, udpRecvdSize, sockRtp);
-		}
 
-		//if (gRtpSessionActive)
-		//{
-			for (i = 0; i < AUDIO_FIFO_LEN; i++)
+		for (i = 0; i < AUDIO_FIFO_LEN; i++)
+		{
+			pAudEl = &gAudioBuf[i];
+			if ((pAudEl->mutex == 0) && (pAudEl->handleNeeded != 0))
 			{
-				pAudEl = &gAudioBuf[i];
-				//if (gPalyThreadMutex[0] )
-				if ((pAudEl->mutex == 0) && (pAudEl->handleNeeded != 0))
-				{
-					//pAudEl->winapiMutex;
-					pAudEl->mutex = 1;
-					PlaySamples(pAudEl);
-					pAudEl->handleNeeded = 0;
-					pAudEl->mutex = 0;
-				}
+				pAudEl->mutex = 1;
+				PlaySamples(pAudEl);
+				pAudEl->handleNeeded = 0;
+				pAudEl->mutex = 0;
 			}
-		//}
+		}
 	}
 	// potential deinit
 	// PlayingDeinit(&gAudioBuf[0]);
 	// PlayingDeinit(&gAudioBuf[1]);
 	return 0;
-#else
-	tAudioElement el;
-	int res;
-	
-	while (1)
-	{
-		if (gRtpSessionActive)
-		{
-			res = QueueGet(&gAudioInQueue, &el);
-			if (res == 0)
-			{
-				if ((el.mutex == 0) && (el.handleNeeded != 0))
-				{
-					PlayingInit(&el);
-					//pAudEl->winapiMutex;
-					el.mutex = 1;
-					PlaySamples(&el);
-					el.handleNeeded = 0;
-					el.mutex = 0;
-				}
-			}
-
-			
-		}
-	}
-#endif
 }
+#endif
 /**************************************************************************************************************************//**
 * @brief Init of PlaySamples function
 ******************************************************************************************************************************/
@@ -187,11 +142,12 @@ int PlaySamples(tAudioElement* pThis)
 {
 	MMRESULT mmRes;
 	struct sWaveXxx* p = &pThis->waveXxx;
-
-	//LPDWORD pdwVolume = 1;
-	//unsigned int audioDevs = waveOutGetNumDevs();
-	//mmRes = waveOutGetVolume(hWaveOut, &pdwVolume);
-	//mmRes = waveOutSetVolume(hWaveOut, 0xfffa);
+#if 0 // volume regulation
+	LPDWORD pdwVolume = 1;
+	unsigned int audioDevs = waveOutGetNumDevs();
+	mmRes = waveOutGetVolume(hWaveOut, &pdwVolume);
+	mmRes = waveOutSetVolume(hWaveOut, 0xfffa);
+#endif
 
 	pThis->waveXxx.whdr.lpData = (LPSTR) pThis->buffer;
 	pThis->waveXxx.whdr.dwBufferLength= (DWORD) pThis->sizeInBytes;
@@ -242,9 +198,6 @@ DWORD WINAPI RecSamplesThread(LPVOID p)
 				gSamplesBufEncoded8bit[i] = gSamplesBufEncoded16bit[i]; // becuase of encoder operates shorts
 			}
 
-			//timestamp = (unsigned int) seconds * SAMPLE_RATE;
-			timestamp += SAMPLES_IN_RTP_PACKET;
-
 			// compose RTP packet
 			RtpCompose(cntr, timestamp, gSamplesBufEncoded8bit, SAMPLES_IN_RTP_PACKET, &pRtpFrame, &rtpFrameLen);
 
@@ -256,8 +209,7 @@ DWORD WINAPI RecSamplesThread(LPVOID p)
 				UdpSendExistSock(gRtpSock, pRtpFrame, rtpFrameLen, gDestIp, port);
 			}
 
-			// modify iterators
-			//seconds += 0.02;
+			timestamp += SAMPLES_IN_RTP_PACKET;
 			cntr++;
 		}
 	}
@@ -317,29 +269,16 @@ int RecordSamples(tAudioElement* pThis)
 	struct sWaveXxx* p = &pThis->waveXxx;
 
 	mmRes = waveInPrepareHeader(p->hWaveIn, &p->whdr, sizeof(p->whdr));
-	if (mmRes != MMSYSERR_NOERROR)
-	{
-		mmRes; // bp
-	}
 
 	// Insert a wave input buffer
 	mmRes = waveInAddBuffer(p->hWaveIn, &p->whdr, sizeof(WAVEHDR));
-	if (mmRes != MMSYSERR_NOERROR)
-	{
-		mmRes; // bp
-	}
 
 	// Commence sampling input
 	mmRes = waveInStart(p->hWaveIn);
-	if (mmRes != MMSYSERR_NOERROR)
-	{
-		mmRes; // bp
-	}
+
 	// Wait until finished recording
 	while (!(p->whdr.dwFlags & WHDR_DONE));
 	waveInUnprepareHeader(p->hWaveIn, &p->whdr, sizeof(WAVEHDR));
-	//while (waveInUnprepareHeader(p->hWaveIn, &p->whdr, sizeof(WAVEHDR)));
-	mmRes;
 }
 /*****************************************************************************************************************************/
 #endif //_WIN32

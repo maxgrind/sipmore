@@ -107,23 +107,6 @@ int UdpSend(char* pBuf, int len, IN_ADDR destIp, unsigned short port)
 	addr.sin_port = htons(port);
 	addr.sin_addr = destIp;
 
-#if 0
-	unsigned long ulMode;
-	WSADATA wsa;
-	ulMode = 1;
-
-	if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
-	{
-		printf("Failed. Error Code : %d", WSAGetLastError());
-		exit(EXIT_FAILURE);
-	}
-	ioctlsocket(s, FIONBIO, (unsigned long*) &ulMode);
-	if (bind(s, (struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR)
-	{
-		printf("Bind failed with error code : %d", WSAGetLastError());
-		exit(EXIT_FAILURE);
-	}
-#endif
 	sendto(s, pBuf, len, 0, (SOCKADDR*) &addr, sizeof(SOCKADDR_IN));
 	return 0;
 }

@@ -51,6 +51,10 @@ void CbKillTransactionClientNotInvite(int type, osip_transaction_t * pTranaction
 void CbKillTransactionServerNotInvite(int type, osip_transaction_t * pTranaction, osip_message_t * pMsg)
 {
 	int i;
+	if (gpOsip != NULL)
+	{
+		i = osip_remove_transaction(gpOsip, pTranaction);
+	}
 	return;
 }
 void CbTransportErrorClientInvite(int type, osip_transaction_t * pTranaction, osip_message_t * pMsg)
@@ -171,44 +175,7 @@ int CbOnIstInviteRcvd(int type, osip_transaction_t * pTranaction, osip_message_t
 	else
 	{
 	}
-	//osip_message_set_content_length(response, "128");
-
-	//osip_body_set_header(pBody, "v", "0");
-	//osip_body_set_header(pBody, "o", "-1415058944 1 IN IP4 192.168.43.13");
-	//osip_body_set_header(pBody, "c", "IN IP4 192.168.1.5");
-	//osip_body_set_header(pBody, "m", "audio 5062 RTP/AVP 0 101");
-	//osip_body_set_header(pBody, "a", "rtpmap:0 PCMU/8000/1");
-
-	//char* pBodyString = NULL;
-	//int bodyStringSize = 0;
-
-	//osip_message_set_body(response, )
-	//osip_body_to_str(pBody, &pBodyString, &bodyStringSize);
-
-//	char pBody2[] = "\
-//v=0\r\n\
-//o=1415058944 1 IN IP4 192.168.43.13\r\n\
-//s=sipmore\r\n\
-//c=IN IP4 192.168.43.13\r\n\
-//t=0 0\r\n\
-//m=audio 5062 RTP/AVP 0\r\n\
-//a=rtpmap:0 PCMU/8000\r\n\
-//a=rtpmap:101 telephone-event/8000\r\n\
-//a=fmtp:101 0-15\r\n\
-//a=prime:100\r\n\
-//";
-	//strcat
-
-//m=audio 5062 RTP/AVP 0\r\n\
-//a=rtpmap:0 PCMU/8000/ 1\r\n\
-//a=rtpmap:110 speex/8000\r\n\	
-//a=fmtp:110 vbr=on
-
-	/*
-a=rtpmap:101 telephone-event/8000\r\n\
-a=fmtp:101 0-15\r\n\
-a=prime:100\r\n\
-	*/
+	
 //m=audio 7076 RTP/AVP 0 101\r\n\
 //					   ^ 0 - means PCMU (98 - dynamic RTP / AVP payload)
 //						 ^ 101 - means DTMF support
@@ -217,12 +184,6 @@ a=prime:100\r\n\
 // and rfc 4733: RTP Payload for DTMF Digits, Telephony Tones, and Telephony Signals
 //a=rtpmap:101 telephone-event/8000\r\n\
 //a=fmtp : 101 0-15\r\n\
-	// 5062 7076 
-	// 192.168.1.5  192.168.43.13
-
-	//pBody->length = sizeof(pBody2);//128;
-
-	//osip_message_set_body(response, pBody2, sizeof(pBody2)-1);
 
 	evt = osip_new_outgoing_sipmessage(response);
 	osip_message_set_reason_phrase(response, osip_strdup("Ok"));

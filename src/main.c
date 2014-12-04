@@ -17,18 +17,19 @@
 #include "lib/wav/wav.h"
 #include "lib/audiostreaming/audiostreaming.h"
 #include "lib/codec/g711/itu/g711itu.h"
+#include "lib/queue/simple_queue.h"
 /*****************************************************************************************************************************/
 int				gWavIsWriting = 0;
 tWaveFileParams gWavParams;
-tAudioElement	gAudioBuf[];
+
 osip_t*			gpOsip;
-SOCKET			gRtpSock;
+
 char			gSpdPort[6];
-char			gClientIp[13];
+
 char			gRtpSessionActive;
 HANDLE WINAPI	gPlayThreadHandle;
 HANDLE WINAPI	gRecThreadHandle;
-HANDLE WINAPI	gPalyThreadMutex[2];
+
 /*****************************************************************************************************************************/
 extern IN_ADDR gDestIp;
 /*****************************************************************************************************************************/
@@ -45,16 +46,10 @@ int main(int argc, char ** argv, char ** env)
 	SOCKET		sock			= UdpServerCreate(&pUdpBuf, PORT_SIP);
 	SOCKADDR_IN sockIn;
 
-	// UDP socket for RTP. todo: create dynamically on server invite receive
-	char*		pRtpBuf;
-	SOCKET		sockRtp			= UdpServerCreate(&pRtpBuf, PORT_RTP);
-	SOCKADDR_IN sockInRtp;
-
 	int			udpRecvdSize	= 0;
 	int			i;
 
 	_itoa_s(PORT_RTP, gSpdPort, 6, 10); // 6 - max quantity of digits in port value; 10 - radix
-	gRtpSock = sockRtp;
 	i = osip_init(&pOsip);
 	gpOsip = pOsip;
 	if (i != 0)
@@ -64,8 +59,6 @@ int main(int argc, char ** argv, char ** env)
 
 	SetCallbacks(pOsip);
 	gWavParams.pFileName = "d:\\sipmore.wav";
-
-
 
 #if 0
 	gWavParams.sampleFormat.compressionCode = WAV_FMT_COMP_CODE_G711_ULAW;
@@ -84,24 +77,29 @@ int main(int argc, char ** argv, char ** env)
 #endif // 0
 
 	FileWavCreate(&gWavParams);
-
-	gAudioBuf[0].mutex			= 0;
-	gAudioBuf[0].handleNeeded	= 0;
-	gAudioBuf[1].mutex			= 0;
-	gAudioBuf[1].handleNeeded	= 0;
-	gRtpSessionActive			= 0;
-	//gPalyThreadMutex[0] = CreateMutex(NULL, 0, NULL);
-	//gPalyThreadMutex[1] = CreateMutex(NULL, 0, NULL);
-
-	// playback thread
-	gPlayThreadHandle = CreateThread(
+	
+		// rtp receiving thread
+		gPlayThreadHandle = CreateThread(
 		NULL, // this thread wouldn't be inherited
 		0, // stack size in bytes (0 - defualts stack size of 1 Mb)
-		PlaySamplesThread,
+		RtpReceivingThread,
 		NULL,
 		0,
 		0
 		);
+
+#if !defined PLAY_IN_RTP_RCV_THREAD 
+		// playback thread
+		gPlayThreadHandle = CreateThread(
+			NULL, // this thread wouldn't be inherited
+			0, // stack size in bytes (0 - defualts stack size of 1 Mb)
+			PlaySamplesThread,
+			NULL,
+			0,
+			0
+			);
+#endif 
+
 
 	// record thread
 	gRecThreadHandle = CreateThread(
@@ -122,12 +120,12 @@ int main(int argc, char ** argv, char ** env)
 			SipProcess(pOsip, pUdpBuf, udpRecvdSize, sock);
 		}
 
-		// RTP 
-		udpRecvdSize = UdpServerProcess(sockRtp, pRtpBuf, &sockInRtp);
-		if (udpRecvdSize != 0)
-		{
-			RtpProcess(pOsip, pRtpBuf, udpRecvdSize, sockRtp);
-		}
+		//// RTP 
+		//udpRecvdSize = UdpServerProcess(sockRtp, pRtpBuf, &sockInRtp);
+		//if (udpRecvdSize != 0)
+		//{
+		//	RtpProcess(pOsip, pRtpBuf, udpRecvdSize, sockRtp);
+		//}
 		
 		// osip core
 		osip_ict_execute(pOsip);

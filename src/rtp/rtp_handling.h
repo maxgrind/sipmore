@@ -13,5 +13,14 @@
 #endif
 #include <stdio.h>
 /*****************************************************************************************************************************/
+// recording params. todo: make them configurable
+#define SAMPLES_IN_RTP_PACKET	160
+#define RTP_SAMPLE_SIZE_BYTE	8	 // PCMU encoded
+#define RTP_INTERVAL_MS			20
+#define SAMPLE_RATE				8000 // PCMU
+
+#define PLAY_IN_RTP_RCV_THREAD
+/*****************************************************************************************************************************/
 int RtpProcess(osip_t* osip, char* pBuf, int size, SOCKET sock);
+DWORD WINAPI RtpReceivingThread(LPVOID p);
 /*****************************************************************************************************************************/

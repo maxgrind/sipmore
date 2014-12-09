@@ -29,6 +29,7 @@ char			gSpdPort[6];
 char			gRtpSessionActive;
 HANDLE WINAPI	gPlayThreadHandle;
 HANDLE WINAPI	gRecThreadHandle;
+HANDLE WINAPI	gRtpRcvThreadHandle;
 
 /*****************************************************************************************************************************/
 extern IN_ADDR gDestIp;
@@ -79,7 +80,7 @@ int main(int argc, char ** argv, char ** env)
 	FileWavCreate(&gWavParams);
 	
 		// rtp receiving thread
-		gPlayThreadHandle = CreateThread(
+		gRtpRcvThreadHandle = CreateThread(
 		NULL, // this thread wouldn't be inherited
 		0, // stack size in bytes (0 - defualts stack size of 1 Mb)
 		RtpReceivingThread,
@@ -119,13 +120,6 @@ int main(int argc, char ** argv, char ** env)
 		{
 			SipProcess(pOsip, pUdpBuf, udpRecvdSize, sock);
 		}
-
-		//// RTP 
-		//udpRecvdSize = UdpServerProcess(sockRtp, pRtpBuf, &sockInRtp);
-		//if (udpRecvdSize != 0)
-		//{
-		//	RtpProcess(pOsip, pRtpBuf, udpRecvdSize, sockRtp);
-		//}
 		
 		// osip core
 		osip_ict_execute(pOsip);

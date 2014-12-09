@@ -20,7 +20,7 @@
 #include "osip2/osip.h" // need to be included after sockets
 #include "rtp/rtp_handling.h"
 
-/*  
+/*
 MMRESULT:
 MMSYSERR_NOERROR = 0,
 MMSYSERR_ERROR = 1,
@@ -71,10 +71,10 @@ DWORD WINAPI PlaySamplesThread(LPVOID p)
 	tAudioElement* pAudEl;
 	int i;
 
-	gAudioBuf[0].mutex			= 0;
-	gAudioBuf[0].handleNeeded	= 0;
-	gAudioBuf[1].mutex			= 0;
-	gAudioBuf[1].handleNeeded	= 0;
+	gAudioBuf[0].mutex = 0;
+	gAudioBuf[0].handleNeeded = 0;
+	gAudioBuf[1].mutex = 0;
+	gAudioBuf[1].handleNeeded = 0;
 
 	PlayingInit(&gAudioBuf[0]);
 	PlayingInit(&gAudioBuf[1]);
@@ -127,7 +127,7 @@ int PlayingInit(tAudioElement* pThis)
 	return mmRes;
 }
 /**************************************************************************************************************************//**
- * @brief Deinit of PlaySamples object
+* @brief Deinit of PlaySamples object
 ******************************************************************************************************************************/
 int PlayingDeinit(tAudioElement* pThis)
 {
@@ -150,7 +150,7 @@ int PlaySamples(tAudioElement* pThis)
 #endif
 
 	pThis->waveXxx.whdr.lpData = (LPSTR) pThis->buffer;
-	pThis->waveXxx.whdr.dwBufferLength= (DWORD) pThis->sizeInBytes;
+	pThis->waveXxx.whdr.dwBufferLength = (DWORD) pThis->sizeInBytes;
 
 
 	mmRes = waveOutPrepareHeader(p->hWaveOut, &p->whdr, sizeof(p->whdr));
@@ -164,20 +164,20 @@ int PlaySamples(tAudioElement* pThis)
 }
 /**************************************************************************************************************************//**
 * @brief Thread for recording samples and pass them through RTP
- todo: create/kill dynamically 
+todo: create/kill dynamically
 ******************************************************************************************************************************/
 DWORD WINAPI RecSamplesThread(LPVOID p)
 {
 	tAudioElement	audEl;
 	tRtpPacket		rtp;			// unpacket rtp packet
 	char*			pRtpFrame;		// packet rtp packet
-	int				rtpFrameLen;	
-	unsigned short	cntr		= 0;
-	unsigned int	timestamp	= 0;
-	int				port		= 0;
+	int				rtpFrameLen;
+	unsigned short	cntr = 0;
+	unsigned int	timestamp = 0;
+	int				port = 0;
 	//float			seconds		= 0;
-	int				i			= 0;
-	
+	int				i = 0;
+
 	// At samplerate 8000 kHz we need to accumulate SAMPLES_IN_RTP_PACKET (160) samples
 	// and then send them in the single RTP packet.
 	// So we got 50 RTP packets per second, i.e. send packet evety 20 ms
@@ -241,7 +241,7 @@ int RecordingInit(tAudioElement* pThis)
 	pThis->waveXxx.whdr.dwBytesRecorded = 0;
 	pThis->waveXxx.whdr.dwFlags = 0;
 	pThis->waveXxx.whdr.dwLoops = 0;
-	pThis->waveXxx.whdr.dwUser	= 0;
+	pThis->waveXxx.whdr.dwUser = 0;
 
 	mmRes = waveInOpen(&pThis->waveXxx.hWaveIn, WAVE_MAPPER, &pThis->waveXxx.wf, 0, 0, WAVE_FORMAT_DIRECT); // WAVE_MAPPED_DEFAULT_COMMUNICATION_DEVICE  CALLBACK_NULL  WAVE_FORMAT_DIRECT
 	if (mmRes != MMSYSERR_NOERROR)
@@ -261,7 +261,7 @@ int RecordingDeinit(tAudioElement* pThis)
 	return mmRes;
 }
 /**************************************************************************************************************************//**
-* @brief 
+* @brief
 ******************************************************************************************************************************/
 int RecordSamples(tAudioElement* pThis)
 {
